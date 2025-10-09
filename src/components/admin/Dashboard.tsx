@@ -1,5 +1,6 @@
 import React from 'react';
 import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
   return (
@@ -39,6 +40,15 @@ export default function AdminDashboard() {
           <Metric label="Sources" value="15" />
           <Metric label="Success Rate" value="98%" />
           <Metric label="Avg Time" value="3m" />
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <Link to="/admin/settings" className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15 transition-colors">Settings</Link>
+          <button className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>Manage Users</button>
+          <button className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15">View Analytics</button>
         </div>
       </section>
 

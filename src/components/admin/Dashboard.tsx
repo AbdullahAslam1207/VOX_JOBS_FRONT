@@ -1,8 +1,60 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
+import { getJobs, getJobsByCity, startScraper } from '../../lib/api';
 import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
+  const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'>('Lahore');
+  const [cityJobs, setCityJobs] = useState<any[]>([]);
+  const [scraperStatus, setScraperStatus] = useState<'idle' | 'running' | 'done'>('idle');
+
+  const fetchAllJobs = async () => {
+    try {
+      const data = await getJobs();
+      setAllJobs(Array.isArray(data) ? data : data?.jobs || []);
+    } catch {}
+  };
+
+  const fetchCityJobs = async () => {
+    try {
+      const data = await getJobsByCity(city);
+      setCityJobs(Array.isArray(data) ? data : data?.jobs || []);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchAllJobs();
+  }, []);
+
+  useEffect(() => {
+    fetchCityJobs();
+  }, [city]);
+
+  const onStartScraper = async () => {
+    setScraperStatus('running');
+    
+    try {
+      await startScraper();
+      setScraperStatus('done');
+      
+      // Refresh job data after scraper finishes
+      await fetchAllJobs();
+      await fetchCityJobs();
+      
+      setTimeout(() => setScraperStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Scraper error:', error);
+      setScraperStatus('idle');
+      
+      // Don't show alert for timeout/network issues - scraper might still be running
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      if (!errorMsg.toLowerCase().includes('network') && !errorMsg.toLowerCase().includes('aborted')) {
+        alert('Failed to start scraper: ' + errorMsg);
+      }
+    }
+  };
+
   return (
     <div className="p-6 md:p-8 text-white/90">
       <h1 className="text-xl md:text-2xl font-semibold mb-5">Dashboard</h1>
@@ -31,15 +83,63 @@ export default function AdminDashboard() {
         <h2 className="text-2xl font-bold text-white text-center mb-1">Job Scraping Control</h2>
         <p className="text-center text-white/70 mb-6 text-sm">Manage and monitor job data collection from various sources</p>
         <div className="flex justify-center">
-          <button className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>
-            Start Job Scraping
+          <button 
+            onClick={onStartScraper} 
+            disabled={scraperStatus === 'running'}
+            className="px-5 py-2.5 rounded-full font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
+            style={{ backgroundColor: '#6A1E55', color: 'white' }}
+          >
+            {scraperStatus === 'running' ? 'Scraper Running... (Please wait)' : scraperStatus === 'done' ? 'Scraper Finished ✓' : 'Start Job Scraping'}
           </button>
         </div>
+        {scraperStatus === 'running' && (
+          <p className="text-center text-white/60 text-xs mt-3">This may take several minutes. Please don't close this page.</p>
+        )}
         <div className="grid grid-cols-4 gap-4 mt-8 text-center">
           <Metric label="Jobs Found" value="247" />
           <Metric label="Sources" value="15" />
           <Metric label="Success Rate" value="98%" />
           <Metric label="Avg Time" value="3m" />
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Jobs by City</h3>
+          <select value={city} onChange={(e)=>setCity(e.target.value as any)} className="bg-white/10 text-white text-sm rounded-md px-3 py-2 border border-white/10">
+            <option value="Lahore">Lahore</option>
+            <option value="Karachi">Karachi</option>
+            <option value="Islamabad">Islamabad</option>
+            <option value="Rawalpindi">Rawalpindi</option>
+          </select>
+        </div>
+        <div className="auth-scroll max-h-64 overflow-y-auto space-y-2 pr-2">
+          {cityJobs.length === 0 ? (
+            <div className="text-white/60 text-sm">No jobs found.</div>
+          ) : (
+            cityJobs.map((j:any, idx:number) => (
+              <div key={idx} className="rounded-lg p-3 border border-white/10 bg-white/5">
+                <div className="font-semibold text-sm">{j.title || j.jobTitle || 'Job'}</div>
+                <div className="text-white/70 text-xs">{j.company || j.companyName || 'Company'} — {j.city || city}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <h3 className="text-lg font-semibold mb-3">All Jobs</h3>
+        <div className="auth-scroll max-h-64 overflow-y-auto space-y-2 pr-2">
+          {allJobs.length === 0 ? (
+            <div className="text-white/60 text-sm">No jobs available.</div>
+          ) : (
+            allJobs.map((j:any, idx:number) => (
+              <div key={idx} className="rounded-lg p-3 border border-white/10 bg-white/5">
+                <div className="font-semibold text-sm">{j.title || j.jobTitle || 'Job'}</div>
+                <div className="text-white/70 text-xs">{j.company || j.companyName || 'Company'} — {j.city || j.location || ''}</div>
+              </div>
+            ))
+          )}
         </div>
       </section>
 
@@ -86,5 +186,3 @@ function Metric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-

@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
+import { registerUser } from '../../lib/api';
+import ErrorDialog from '../common/ErrorDialog';
 
 const SignupForm = ({ selectedRole }) => {
   const [fullName, setFullName] = useState('');
@@ -10,51 +12,40 @@ const SignupForm = ({ selectedRole }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resume, setResume] = useState(null);
   const [resumeFileName, setResumeFileName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleResumeChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
       if (!allowedTypes.includes(file.type)) {
-        alert('Please upload a PDF or Word document');
+        setError('Please upload a PDF or Word document');
         return;
       }
-      
-      // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        setError('File size must be less than 5MB');
         return;
       }
-      
       setResume(file);
       setResumeFileName(file.name);
     }
   };
 
-  const handleSignup = () => {
-    // Admin signup is not allowed. Only job seeker accounts can be created.
-    const role = 'jobseeker';
-    
-    // Validate required fields
+  const handleSignup = async () => {
     if (!fullName || !email || !password || !confirmPassword) {
-      alert('Please fill in all required fields');
+      setError('Please fill in all required fields');
       return;
     }
-    
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
-    
-    if (!resume) {
-      alert('Please upload your resume');
-      return;
+    try {
+      await registerUser({ fullname: fullName, email, password, role: 'Job_Seeker' });
+      window.location.href = '/user/jobs';
+    } catch (e: any) {
+      setError(e?.message || 'Registration failed');
     }
-    
-    console.log('Signup:', { role, fullName, email, password, confirmPassword, resume: resume.name });
-    // Redirect new job seeker to user dashboard for now
-    window.location.href = '/user';
   };
 
   return (
@@ -87,8 +78,6 @@ const SignupForm = ({ selectedRole }) => {
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
       />
-      
-      {/* Resume Upload Field */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-white mb-2">
           Resume/CV <span className="text-red-400">*</span>
@@ -111,10 +100,11 @@ const SignupForm = ({ selectedRole }) => {
           Upload your resume in PDF or Word format (max 5MB)
         </p>
       </div>
-      
       <SubmitButton onClick={handleSignup}>
         Create Job Seeker Account
       </SubmitButton>
+
+      <ErrorDialog open={!!error} message={error || ''} onClose={() => setError(null)} />
     </div>
   );
 };

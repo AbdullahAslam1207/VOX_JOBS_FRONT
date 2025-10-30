@@ -2,18 +2,30 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
+import { loginUser } from '../../lib/api';
+import ErrorDialog from '../common/ErrorDialog';
 
 const LoginForm = ({ selectedRole }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    if (selectedRole === 'admin') {
-      window.location.href = '/admin';
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Please enter both email and password.');
       return;
     }
-    // Jobseeker login goes to user dashboard
-    window.location.href = '/user';
+    const role = selectedRole === 'admin' ? 'Admin' : 'Job_Seeker';
+    try {
+      await loginUser({ email, password, role });
+      if (selectedRole === 'admin') {
+        window.location.href = '/admin';
+      } else {
+        window.location.href = '/user/jobs';
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Invalid credentials. Please try again.');
+    }
   };
 
   return (
@@ -35,6 +47,8 @@ const LoginForm = ({ selectedRole }) => {
       <SubmitButton onClick={handleLogin}>
         Login as {selectedRole === 'admin' ? 'Admin' : 'Job Seeker'}
       </SubmitButton>
+
+      <ErrorDialog open={!!error} message={error || ''} onClose={() => setError(null)} />
     </div>
   );
 };

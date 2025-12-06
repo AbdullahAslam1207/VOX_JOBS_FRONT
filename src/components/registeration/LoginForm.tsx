@@ -2,11 +2,17 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
+<<<<<<< HEAD
 import { loginUser, mapUiRoleToBackend } from '../../api';
+=======
+import { loginUser } from '../../lib/api';
+import ErrorDialog from '../common/ErrorDialog';
+>>>>>>> 46a1eaef149893e9c722aaf740180cea9c62b523
 
 const LoginForm = ({ selectedRole }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+<<<<<<< HEAD
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,6 +47,26 @@ const LoginForm = ({ selectedRole }) => {
     } finally {
       setLoading(false);
     }
+=======
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+    const role = selectedRole === 'admin' ? 'Admin' : 'Job_Seeker';
+    try {
+      await loginUser({ email, password, role });
+      if (selectedRole === 'admin') {
+        window.location.href = '/admin';
+      } else {
+        window.location.href = '/user/jobs';
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Invalid credentials. Please try again.');
+    }
+>>>>>>> 46a1eaef149893e9c722aaf740180cea9c62b523
   };
 
   return (
@@ -63,6 +89,8 @@ const LoginForm = ({ selectedRole }) => {
       <SubmitButton onClick={handleLogin}>
         {loading ? 'Signing in…' : `Login as ${selectedRole === 'admin' ? 'Admin' : 'Job Seeker'}`}
       </SubmitButton>
+
+      <ErrorDialog open={!!error} message={error || ''} onClose={() => setError(null)} />
     </div>
   );
 };

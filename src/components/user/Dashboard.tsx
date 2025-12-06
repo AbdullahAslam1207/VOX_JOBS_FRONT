@@ -1,12 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getAllJobs } from '../../api';
 
 export default function UserDashboard() {
+  const [jobsCount, setJobsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getAllJobs();
+        setJobsCount((jobs || []).length);
+      } catch {}
+    };
+    load();
+  }, []);
+
   return (
     <div className="p-6 md:p-8 text-white/90">
       <h1 className="text-xl md:text-2xl font-semibold mb-5">Welcome back</h1>
 
       <div className="grid md:grid-cols-3 gap-5 mb-6">
-        {[{ t: 'Saved Jobs', v: '8' }, { t: 'Applications', v: '3' }].map((m) => (
+        {[{ t: 'Saved Jobs', v: '8' }, { t: 'Applications', v: '3' }, { t: 'Total Jobs', v: jobsCount !== null ? String(jobsCount) : '—' }].map((m) => (
           <div key={m.t} className="rounded-xl p-5 border border-white/10" style={{ background: 'linear-gradient(160deg, rgba(106,30,85,0.25), rgba(19,16,34,0.6))' }}>
             <div className="text-xs text-white/70">{m.t}</div>
             <div className="text-2xl font-bold leading-tight">{m.v}</div>

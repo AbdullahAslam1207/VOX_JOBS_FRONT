@@ -2,19 +2,53 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
+import { registerUser, mapUiRoleToBackend } from '../../api';
 
 const SignupForm = ({ selectedRole }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSignup = () => {
-    // Admin signup is not allowed. Only job seeker accounts can be created.
-    const role = 'jobseeker';
-    console.log('Signup:', { role, fullName, email, password, confirmPassword });
-    // Redirect new job seeker to user dashboard for now
-    window.location.href = '/user';
+  const handleSignup = async () => {
+    try {
+      setError('');
+      if (!fullName || !email || !password || !confirmPassword) {
+        setError('Please fill all fields');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      setLoading(true);
+      const role = mapUiRoleToBackend('jobseeker');
+      await registerUser({ fullname: fullName, email, password, role });
+      window.location.href = '/user';
+    } catch (e: any) {
+      const errorMessage = e?.message || '';
+      // Provide user-friendly error messages
+      if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('detail')) {
+        setError('Unable to create account. Please try again.');
+      } else if (errorMessage.includes('409') || errorMessage.includes('Conflict') || errorMessage.includes('already exists') || errorMessage.includes('already registered')) {
+        setError('An account with this email already exists. Please use a different email or try logging in.');
+      } else if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
+        setError('Please check that all fields are filled correctly.');
+      } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server')) {
+        setError('Server error. Please try again later.');
+      } else if (errorMessage.includes('email') && errorMessage.includes('invalid')) {
+        setError('Please enter a valid email address.');
+      } else if (errorMessage) {
+        // If it's a user-friendly message, use it; otherwise show generic error
+        setError(errorMessage.length < 100 ? errorMessage : 'Unable to create account. Please try again.');
+      } else {
+        setError('Unable to connect. Please check your internet connection and try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -47,8 +81,9 @@ const SignupForm = ({ selectedRole }) => {
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
       />
+      {error && <div className="text-red-300 text-sm mb-2">{error}</div>}
       <SubmitButton onClick={handleSignup}>
-        Create Job Seeker Account
+        {loading ? 'Creating account…' : 'Create Job Seeker Account'}
       </SubmitButton>
     </div>
   );

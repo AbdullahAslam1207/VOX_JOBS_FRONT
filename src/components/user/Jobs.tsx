@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getAllJobs, getJobsByCity, getJobsByTitle, JobApi } from '../../api';
 
 type Job = {
   id: string;
@@ -10,15 +11,12 @@ type Job = {
   email?: string;
 };
 
-const SAMPLE_JOBS: Job[] = [
-  { id: '1', title: 'Frontend Developer', company: 'Tech Corp', location: 'Remote', description: 'Build delightful UIs with React and TypeScript.', audioUrl: '/job-1.mp3', email: 'jobs@techcorp.com' },
-  { id: '2', title: 'Backend Engineer', company: 'DataWorks', location: 'Lahore', description: 'Design robust APIs with Node.js and PostgreSQL.', audioUrl: '/job-2.mp3' },
-  { id: '3', title: 'Mobile Engineer', company: 'Appify', location: 'Karachi', description: 'Ship beautiful apps in React Native.', audioUrl: '/job-3.mp3', email: 'careers@appify.com' },
-];
-
 export default function UserJobs() {
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
+  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi' | ''>('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(false);
   const [onlyRemote, setOnlyRemote] = useState(false);
   const [listening, setListening] = useState(false);
   const [saved, setSaved] = useState<Record<string, Job>>(() => {
@@ -51,13 +49,86 @@ export default function UserJobs() {
   }, []);
 
   const filteredJobs = useMemo(() => {
-    return SAMPLE_JOBS.filter((j) => {
+    return jobs.filter((j) => {
       const matchesQuery = (j.title + ' ' + j.company + ' ' + j.description).toLowerCase().includes(query.toLowerCase());
       const matchesLocation = location ? j.location.toLowerCase().includes(location.toLowerCase()) : true;
+      const matchesCity = city ? j.location?.toLowerCase().includes(city.toLowerCase()) : true;
       const matchesRemote = onlyRemote ? j.location.toLowerCase().includes('remote') : true;
-      return matchesQuery && matchesLocation && matchesRemote;
+      return matchesQuery && matchesLocation && matchesRemote && matchesCity;
     });
-  }, [query, location, onlyRemote]);
+  }, [query, location, onlyRemote, city, jobs]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const data = await getAllJobs();
+        const norm: Job[] = (data || []).map((d: JobApi) => ({
+          id: String(d.id ?? Math.random()),
+          title: d.title || 'Untitled',
+          company: d.company || 'Unknown',
+          location: d.location || '',
+          description: d.description || '',
+          email: d.email,
+        }));
+        setJobs(norm);
+      } catch (e) {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        if (!query.trim()) return;
+        const res = await getJobsByTitle(query.trim());
+        const norm: Job[] = (res || []).map((d: JobApi) => ({
+          id: String(d.id ?? Math.random()),
+          title: d.title || 'Untitled',
+          company: d.company || 'Unknown',
+          location: d.location || '',
+          description: d.description || '',
+          email: d.email,
+        }));
+        setJobs(norm);
+      } catch {
+        // ignore
+      }
+    }, 400);
+    return () => {
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    const loadCity = async () => {
+      try {
+        if (!city) return;
+        setLoading(true);
+        const res = await getJobsByCity(city as any);
+        const norm: Job[] = (res || []).map((d: JobApi) => ({
+          id: String(d.id ?? Math.random()),
+          title: d.title || 'Untitled',
+          company: d.company || 'Unknown',
+          location: d.location || '',
+          description: d.description || '',
+          email: d.email,
+        }));
+        setJobs(norm);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCity();
+  }, [city]);
 
   function toggleVoice() {
     if (!recognitionRef.current) return;
@@ -130,6 +201,16 @@ export default function UserJobs() {
             <span className="text-white/60">📍</span>
             <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location or Remote" className="w-full bg-transparent text-white placeholder-white/40 outline-none" />
           </div>
+          <div className="w-full md:w-[220px] flex items-center gap-2 bg-white/5 border border-white/10 rounded-md px-3 py-2">
+            <span className="text-white/60">🏙️</span>
+            <select value={city} onChange={(e) => setCity(e.target.value as any)} className="w-full bg-transparent text-white outline-none">
+              <option value="" className="bg-purple-900 text-white">All Cities</option>
+              <option value="Lahore" className="bg-purple-900 text-white">Lahore</option>
+              <option value="Karachi" className="bg-purple-900 text-white">Karachi</option>
+              <option value="Islamabad" className="bg-purple-900 text-white">Islamabad</option>
+              <option value="Rawalpindi" className="bg-purple-900 text-white">Rawalpindi</option>
+            </select>
+          </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={onlyRemote} onChange={(e) => setOnlyRemote(e.target.checked)} /> Remote</label>
             <button onClick={toggleVoice} className={`px-3 py-2 rounded-md text-sm font-semibold ${listening ? 'bg-emerald-600' : 'bg-[#6A1E55]'} text-white`}>{listening ? '🎤 Listening' : '🎤 Voice'}</button>
@@ -137,6 +218,7 @@ export default function UserJobs() {
         </div>
       </div>
 
+      {loading && <div className="text-white/70 mb-3">Loading jobs…</div>}
       <div className="grid md:grid-cols-2 gap-4">
         {filteredJobs.map((job) => (
           <div key={job.id} className="rounded-xl p-5 border border-white/10 bg-white/5">

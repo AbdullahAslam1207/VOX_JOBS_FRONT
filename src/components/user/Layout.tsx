@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import Chatbot from '../landingpage/Chatbot';
 
 export default function UserLayout() {
+  const [showChatbot, setShowChatbot] = useState(false);
+
   return (
     <div className="min-h-screen w-full grid grid-cols-[260px_1fr]" style={{ background: 'radial-gradient(1200px 800px at 70% 0%, rgba(166,77,121,0.15), transparent 60%), radial-gradient(800px 600px at 0% 100%, rgba(106,30,85,0.15), transparent 60%)', backgroundColor: '#120f16' }}>
       <aside className="h-screen sticky top-0 bg-[#131022] text-white/90">
@@ -17,11 +20,17 @@ export default function UserLayout() {
           <NavItem to="jobs" label="Browse Jobs" />
           <NavItem to="saved" label="Saved Jobs" />
         </nav>
+        <button onClick={() => setShowChatbot(true)} className="mx-4 mt-4 w-[calc(100%-2rem)] px-4 py-3 rounded-lg font-medium text-sm bg-[#6A1E55] hover:bg-[#7A2E65] text-white transition-colors">
+          💬 Chat with Assistant
+        </button>
         <button onClick={() => (window.location.href = '/')} className="mt-auto w-full text-left px-4 py-6 text-sm text-white/80 hover:text-white/100">Logout</button>
       </aside>
       <main className="min-h-screen">
         <Outlet />
       </main>
+      
+      {/* Chatbot */}
+      <Chatbot isOpen={showChatbot} onClose={() => setShowChatbot(false)} />
     </div>
   );
 }

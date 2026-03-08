@@ -1,6 +1,6 @@
 // Centralized API client for backend integration
-const BASE_URL = 'https://5rtdm14j-8000.inc1.devtunnels.ms';
-const CHAT_BASE_URL = 'https://6tbj4f6v-8000.inc1.devtunnels.ms';
+const BASE_URL = 'https://6m8wrpjs-8000.inc1.devtunnels.ms';
+const CHAT_BASE_URL = 'https://n5rrrx4s-8000.asse.devtunnels.ms';
 
 // Centralized API endpoints - change these to update all API calls
 export const API_ENDPOINTS = {
@@ -20,7 +20,7 @@ export const API_ENDPOINTS = {
 		CHAT_RESPONSE: '/chat_response_jobs',
 	},
 	VECTOR_STORE: {
-		CREATE_VECTOR_STORE: 'https://6tbj4f6v-8000.inc1.devtunnels.ms/create_vector_store',
+		CREATE_VECTOR_STORE: 'https://n5rrrx4s-8000.asse.devtunnels.ms/create_vector_store',
 	},
 } as const;
 

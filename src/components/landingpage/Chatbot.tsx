@@ -13,14 +13,55 @@ interface Message {
   cards?: ChatJobCard[];
 }
 
+const CHAT_SESSIONS_KEY = 'voxjobs_chat_sessions';
+const CHAT_HISTORY_KEY = 'voxjobs_chat_history'; // legacy migration
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: number;
+}
+
+const DEFAULT_MESSAGES: Message[] = [
+  {
+    id: '1',
+    type: 'bot',
+    text: "Hello! I'm here to help you find jobs. What kind of job are you looking for?",
+  },
+];
+
+function loadSessions(): Record<string, Omit<ChatSession, 'id'>> {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+    // Migrate old single chat history to one session
+    const legacy = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (legacy) {
+      try {
+        const arr = JSON.parse(legacy);
+        if (Array.isArray(arr) && arr.length > 0) {
+          const id = Date.now().toString();
+          const firstUser = arr.find((m: Message) => m.type === 'user');
+          const title = firstUser?.text?.slice(0, 40) || 'Previous chat';
+          const session = { title, messages: arr, updatedAt: Date.now() };
+          localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify({ [id]: session }));
+          localStorage.removeItem(CHAT_HISTORY_KEY);
+          return { [id]: session };
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return {};
+}
+
 export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'bot',
-      text: "Hello! I'm here to help you find jobs. What kind of job are you looking for?",
-    },
-  ]);
+  const [sessions, setSessions] = useState<Record<string, Omit<ChatSession, 'id'>>>(loadSessions);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>(DEFAULT_MESSAGES);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -34,6 +75,13 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const inputNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const isRecordingRef = useRef(false);
+  const hasSpokenRef = useRef(false);
+  const lastSoundTimeRef = useRef(0);
+  const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SILENCE_DURATION = 2000;
+  const AUDIO_THRESHOLD = 0.01;
+  const newChatHasSessionRef = useRef(false);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -51,6 +99,63 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // When switching to a session, load its messages
+  useEffect(() => {
+    if (activeSessionId && sessions[activeSessionId]) {
+      setMessages(sessions[activeSessionId].messages);
+    } else if (activeSessionId === null) {
+      setMessages(DEFAULT_MESSAGES);
+      newChatHasSessionRef.current = false;
+    }
+  }, [activeSessionId]); // only run when user switches; don't depend on sessions to avoid overwriting
+
+  // Persist: update active session with current messages, or create new session when user sends first message in "new chat"
+  useEffect(() => {
+    if (activeSessionId) {
+      const firstUser = messages.find((m) => m.type === 'user');
+      const title = firstUser?.text?.slice(0, 40) || 'Chat';
+      setSessions((prev) => {
+        const next = { ...prev, [activeSessionId]: { title, messages, updatedAt: Date.now() } };
+        try {
+          localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(next));
+        } catch (e) {
+          console.error('Failed to save chat sessions', e);
+        }
+        return next;
+      });
+    }
+  }, [messages, activeSessionId]);
+
+  // When user sends first message in "new chat", create a new session (once)
+  useEffect(() => {
+    if (activeSessionId !== null) {
+      newChatHasSessionRef.current = false;
+      return;
+    }
+    const firstUser = messages.find((m) => m.type === 'user');
+    if (!firstUser || newChatHasSessionRef.current) return;
+    newChatHasSessionRef.current = true;
+    const id = Date.now().toString();
+    const title = firstUser.text?.slice(0, 40) || 'New chat';
+    setSessions((prev) => {
+      const next = { ...prev, [id]: { title, messages, updatedAt: Date.now() } };
+      try {
+        localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(next));
+      } catch (e) {
+        console.error('Failed to save chat sessions', e);
+      }
+      return next;
+    });
+    setActiveSessionId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  // Auto-connect voice WebSocket when dashboard loads (so it's ready when user opens chat)
+  useEffect(() => {
+    ensureWebSocket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clean up audio and WebSocket on unmount or when chatbot closes
   useEffect(() => {
@@ -191,6 +296,26 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
     }
   }
 
+  // Normalize job object from backend (handles title/job_title, company/company_name, etc.)
+  function normalizeJobCard(raw: Record<string, unknown>): ChatJobCard {
+    return {
+      title: (raw.title || raw.job_title || '') as string,
+      company_name: (raw.company_name || raw.company || '') as string,
+      location: (raw.location || '') as string,
+      city: (raw.city || '') as string,
+      salary: (raw.salary || raw.salary_range || '') as string,
+      job_type: (raw.job_type || raw.type || '') as string,
+      experience: (raw.experience || '') as string,
+      education: (raw.education || '') as string,
+      posted_date: (raw.posted_date || '') as string,
+      apply_before: (raw.apply_before || '') as string,
+      apply_link: (raw.apply_link || '') as string,
+      job_description: (raw.job_description || raw.description || '') as string,
+      skills: (raw.skills || '') as string,
+      job_link: (raw.job_link || raw.url || raw.job_url || raw.link || '') as string,
+    };
+  }
+
   // Voice chat: establish WebSocket connection
   function ensureWebSocket() {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -204,7 +329,7 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
 
       ws.onopen = () => {
         setIsVoiceConnected(true);
-        setVoiceStatus('Connected. Tap mic to speak.');
+        setVoiceStatus('Connected. Click Start Speaking.');
       };
 
       ws.onclose = () => {
@@ -243,16 +368,17 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
 
           if (data.type === 'response') {
             const rawMessage: string = data.message || '';
-            const jobs: ChatJobCard[] = Array.isArray(data.jobs) ? data.jobs : [];
+            const rawJobs = Array.isArray(data.jobs) ? data.jobs : [];
+            const jobs: ChatJobCard[] = rawJobs.map((j: Record<string, unknown>) => normalizeJobCard(j));
 
             let messageText = rawMessage;
-            let cards: ChatJobCard[] = jobs || [];
+            let cards: ChatJobCard[] = jobs;
 
             if (messageText.includes('__CARDS__')) {
               const parsed = parseBotResponse(messageText);
               messageText = parsed.text;
               if (parsed.cards.length > 0) {
-                cards = parsed.cards;
+                cards = parsed.cards.map((c) => normalizeJobCard(c as unknown as Record<string, unknown>));
               }
             }
 
@@ -291,6 +417,28 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
     return buffer;
   }
 
+  function detectSilence(floatData: Float32Array): boolean {
+    let sum = 0;
+    for (let i = 0; i < floatData.length; i++) {
+      sum += floatData[i] * floatData[i];
+    }
+    const rms = Math.sqrt(sum / floatData.length);
+    return rms < AUDIO_THRESHOLD;
+  }
+
+  const handleSilenceDetectionRef = useRef(() => {
+    if (!hasSpokenRef.current) return;
+    const timeSinceLastSound = Date.now() - lastSoundTimeRef.current;
+    if (timeSinceLastSound >= SILENCE_DURATION && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'end' }));
+      setVoiceStatus('Processing your message...');
+      hasSpokenRef.current = false;
+      lastSoundTimeRef.current = Date.now();
+      stopRecordingRef.current(false);
+    }
+  });
+  const stopRecordingRef = useRef<(sendEnd: boolean) => void>(() => {});
+
   async function startRecording() {
     if (isRecording) return;
 
@@ -307,10 +455,31 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       audioContextRef.current = audioContext;
       inputNodeRef.current = inputNode;
       processorRef.current = processor;
+      isRecordingRef.current = true;
+      hasSpokenRef.current = false;
+      lastSoundTimeRef.current = Date.now();
 
       processor.onaudioprocess = (event) => {
-        if (!isRecording) return;
+        if (!isRecordingRef.current) return;
         const floatData = event.inputBuffer.getChannelData(0);
+        const isSilent = detectSilence(floatData);
+
+        if (!isSilent) {
+          lastSoundTimeRef.current = Date.now();
+          hasSpokenRef.current = true;
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+          }
+        } else if (hasSpokenRef.current) {
+          if (!silenceTimeoutRef.current) {
+            silenceTimeoutRef.current = setTimeout(() => {
+              silenceTimeoutRef.current = null;
+              handleSilenceDetectionRef.current();
+            }, SILENCE_DURATION);
+          }
+        }
+
         const pcm16 = float32ToPCM16(floatData);
         const ws = wsRef.current;
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -322,7 +491,7 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       processor.connect(audioContext.destination);
 
       setIsRecording(true);
-      setVoiceStatus('Listening... release mic to send.');
+      setVoiceStatus('Listening... Speak now (auto-detects silence).');
     } catch (err: any) {
       console.error('Mic error:', err);
       setVoiceStatus(`Mic error: ${err?.message || 'Unable to access microphone.'}`);
@@ -332,7 +501,13 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
   function stopRecording(sendEnd: boolean = true) {
     if (!isRecording && !audioContextRef.current && !mediaStreamRef.current) return;
 
+    isRecordingRef.current = false;
     setIsRecording(false);
+
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
 
     if (processorRef.current) {
       processorRef.current.disconnect();
@@ -351,20 +526,57 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       mediaStreamRef.current = null;
     }
 
-    if (sendEnd && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (sendEnd && hasSpokenRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: 'end' }));
       setVoiceStatus('Processing your message...');
     } else {
-      setVoiceStatus(isVoiceConnected ? 'Connected. Tap mic to speak.' : 'Voice assistant ready.');
+      setVoiceStatus(isVoiceConnected ? 'Connected. Click Start Speaking.' : 'Voice assistant ready.');
+    }
+  }
+  stopRecordingRef.current = stopRecording;
+
+  function handleVoiceToggle() {
+    if (isRecording) {
+      stopRecording(true);
+    } else {
+      startRecording();
     }
   }
 
-  function handleVoiceButtonDown() {
-    startRecording();
+  function handleNewChat() {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'clear' }));
+    }
+    newChatHasSessionRef.current = false;
+    setActiveSessionId(null);
+    setMessages(DEFAULT_MESSAGES);
+    setVoiceStatus('Voice assistant ready.');
   }
 
-  function handleVoiceButtonUp() {
-    stopRecording(true);
+  function handleSelectSession(id: string) {
+    if (sessions[id]) {
+      setActiveSessionId(id);
+      setMessages(sessions[id].messages);
+    }
+  }
+
+  function handleClearChat() {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'clear' }));
+    }
+    setMessages(DEFAULT_MESSAGES);
+    if (activeSessionId) {
+      setSessions((prev) => {
+        const next = { ...prev, [activeSessionId]: { ...prev[activeSessionId], messages: DEFAULT_MESSAGES, updatedAt: Date.now() } };
+        try {
+          localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(next));
+        } catch (e) {
+          console.error('Failed to save chat sessions', e);
+        }
+        return next;
+      });
+    }
+    setVoiceStatus('Chat cleared. Ready.');
   }
 
   function playAudio(audioData: Blob | ArrayBuffer) {
@@ -378,7 +590,7 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       });
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        setVoiceStatus(isVoiceConnected ? 'Connected. Tap mic to speak.' : 'Voice assistant ready.');
+        setVoiceStatus(isVoiceConnected ? 'Connected. Click Start Speaking.' : 'Voice assistant ready.');
       };
     } catch (err: any) {
       console.error('Error playing audio:', err);
@@ -433,9 +645,48 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
         }
       `}</style>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl h-[85vh] max-h-[800px] rounded-2xl bg-[#1A1A1D] border border-white/10 shadow-2xl flex flex-col">
+      <div className="relative w-full max-w-6xl h-[85vh] max-h-[800px] rounded-2xl border border-white/10 shadow-2xl flex overflow-hidden bg-[#1A1A1D]">
+        {/* Left sidebar: all chats */}
+        <aside className="w-56 shrink-0 border-r border-white/10 flex flex-col bg-[#151518] rounded-l-2xl">
+          <div className="p-3 border-b border-white/10">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="w-full px-3 py-2.5 rounded-lg text-sm font-semibold bg-[#6A1E55] hover:bg-[#7A2E65] text-white transition-colors flex items-center justify-center gap-2"
+            >
+              <span>+</span>
+              <span>New chat</span>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+            <div className="text-xs text-white/50 px-2 py-1.5 font-medium">All chats</div>
+            {Object.entries(sessions)
+              .sort(([, a], [, b]) => (b.updatedAt || 0) - (a.updatedAt || 0))
+              .map(([id, session]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleSelectSession(id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors mb-1 truncate ${
+                    activeSessionId === id
+                      ? 'bg-[#6A1E55]/60 text-white'
+                      : 'text-white/80 hover:bg-white/10'
+                  }`}
+                  title={session.title}
+                >
+                  {session.title || 'Chat'}
+                </button>
+              ))}
+            {Object.keys(sessions).length === 0 && (
+              <p className="text-white/40 text-xs px-2 py-2">No previous chats yet</p>
+            )}
+          </div>
+        </aside>
+
+        {/* Main chat area */}
+        <div className="flex-1 flex flex-col min-w-0 rounded-r-2xl bg-[#1A1A1D]">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#6A1E55] flex items-center justify-center">
               <span className="text-white text-lg">🤖</span>
@@ -520,18 +771,17 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onMouseDown={handleVoiceButtonDown}
-                onMouseUp={handleVoiceButtonUp}
-                onMouseLeave={() => isRecording && handleVoiceButtonUp()}
+                onClick={handleVoiceToggle}
                 disabled={loading}
-                className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-colors ${
                   isRecording
-                    ? 'bg-red-600 border-red-400 text-white'
-                    : 'bg-[#6A1E55] border-[#A64D79] text-white hover:bg-[#7A2E65]'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-[#6A1E55] hover:bg-[#7A2E65] text-white'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                title="Hold to speak"
+                title={isRecording ? 'Listening (auto-sends after 2–3 sec silence)' : 'Start Speaking'}
               >
-                🎤
+                <span>🎤</span>
+                <span>{isRecording ? 'Listening...' : 'Start Speaking'}</span>
               </button>
               <input
                 ref={inputRef}
@@ -550,6 +800,14 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
               >
                 Send
               </button>
+              <button
+                type="button"
+                onClick={handleClearChat}
+                className="px-4 py-3 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 font-medium transition-colors"
+                title="Clear chat"
+              >
+                🗑 Clear
+              </button>
             </div>
             <div className="text-xs text-white/60 flex items-center justify-between">
               <span>{voiceStatus}</span>
@@ -567,6 +825,7 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
               </span>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

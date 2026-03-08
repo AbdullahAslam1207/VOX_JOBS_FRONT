@@ -1,31 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
-<<<<<<< HEAD
-import { getAllJobs, startScraperAndWait, createVectorStore } from '../../api';
+import { getAllJobs, getJobsByCity, startScraperAndWait, createVectorStore } from '../../api';
+import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const [starting, setStarting] = useState(false);
   const [jobsCount, setJobsCount] = useState<number | null>(null);
   const [vectorStatus, setVectorStatus] = useState<'idle' | 'starting' | 'running' | 'completed' | 'failed'>('idle');
   const [vectorHttpCode, setVectorHttpCode] = useState<number | null>(null);
+  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'>('Lahore');
+  const [cityJobs, setCityJobs] = useState<any[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
         const jobs = await getAllJobs();
         setJobsCount((jobs || []).length);
+        setAllJobs(Array.isArray(jobs) ? jobs : []);
       } catch {}
     };
     load();
   }, []);
 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getJobsByCity(city);
+        setCityJobs(Array.isArray(jobs) ? jobs : jobs?.jobs || []);
+      } catch {}
+    };
+    load();
+  }, [city]);
+
   const startScraper = async () => {
     try {
       setStarting(true);
       await startScraperAndWait();
-      // Refresh jobs after scraper completes
       const jobs = await getAllJobs();
       setJobsCount((jobs || []).length);
+      setAllJobs(Array.isArray(jobs) ? jobs : []);
+      const cityData = await getJobsByCity(city);
+      setCityJobs(Array.isArray(cityData) ? cityData : cityData?.jobs || []);
     } finally {
       setStarting(false);
     }
@@ -34,71 +50,13 @@ export default function AdminDashboard() {
   const generateVectorStore = async () => {
     try {
       setVectorStatus('starting');
-      console.log('Vector store creation: starting');
       setVectorStatus('running');
-      console.log('Vector store creation: running');
       const code = await createVectorStore();
       setVectorHttpCode(code);
-      console.log('Vector store creation HTTP status:', code);
       setVectorStatus('completed');
-      console.log('Vector store creation: completed');
     } catch (e) {
       setVectorStatus('failed');
       console.error('Vector store creation failed', e);
-=======
-import { getJobs, getJobsByCity, startScraper } from '../../lib/api';
-import { Link } from 'react-router-dom';
-
-export default function AdminDashboard() {
-  const [allJobs, setAllJobs] = useState<any[]>([]);
-  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'>('Lahore');
-  const [cityJobs, setCityJobs] = useState<any[]>([]);
-  const [scraperStatus, setScraperStatus] = useState<'idle' | 'running' | 'done'>('idle');
-
-  const fetchAllJobs = async () => {
-    try {
-      const data = await getJobs();
-      setAllJobs(Array.isArray(data) ? data : data?.jobs || []);
-    } catch {}
-  };
-
-  const fetchCityJobs = async () => {
-    try {
-      const data = await getJobsByCity(city);
-      setCityJobs(Array.isArray(data) ? data : data?.jobs || []);
-    } catch {}
-  };
-
-  useEffect(() => {
-    fetchAllJobs();
-  }, []);
-
-  useEffect(() => {
-    fetchCityJobs();
-  }, [city]);
-
-  const onStartScraper = async () => {
-    setScraperStatus('running');
-    
-    try {
-      await startScraper();
-      setScraperStatus('done');
-      
-      // Refresh job data after scraper finishes
-      await fetchAllJobs();
-      await fetchCityJobs();
-      
-      setTimeout(() => setScraperStatus('idle'), 3000);
-    } catch (error) {
-      console.error('Scraper error:', error);
-      setScraperStatus('idle');
-      
-      // Don't show alert for timeout/network issues - scraper might still be running
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      if (!errorMsg.toLowerCase().includes('network') && !errorMsg.toLowerCase().includes('aborted')) {
-        alert('Failed to start scraper: ' + errorMsg);
-      }
->>>>>>> 46a1eaef149893e9c722aaf740180cea9c62b523
     }
   };
 
@@ -129,7 +87,6 @@ export default function AdminDashboard() {
       <section className="rounded-2xl p-8 border border-[#6A1E55]/40 mb-6" style={{ background: 'radial-gradient(1000px 600px at 50% -10%, rgba(166,77,121,0.2), transparent), linear-gradient(180deg, rgba(43,22,39,0.6), rgba(19,16,34,0.6))' }}>
         <h2 className="text-2xl font-bold text-white text-center mb-1">Job Scraping Control</h2>
         <p className="text-center text-white/70 mb-6 text-sm">Manage and monitor job data collection from various sources</p>
-<<<<<<< HEAD
         <div className="flex flex-col items-center gap-3">
           <button onClick={startScraper} disabled={starting} className="px-5 py-2.5 rounded-full font-semibold text-sm disabled:opacity-60" style={{ backgroundColor: '#6A1E55', color: 'white' }}>
             {starting ? 'Running scraper…' : 'Start Job Scraping'}
@@ -140,23 +97,9 @@ export default function AdminDashboard() {
         </div>
         {vectorStatus !== 'idle' && (
           <div className="text-center text-white/70 mt-3 text-sm">
-            Vector store: {vectorStatus === 'starting' && 'starting'}{vectorStatus === 'running' && 'running'}{vectorStatus === 'completed' && 'completed'}{vectorStatus === 'failed' && 'failed'}
+            Vector store: {vectorStatus}
             {vectorHttpCode !== null && ` (HTTP ${vectorHttpCode})`}
           </div>
-=======
-        <div className="flex justify-center">
-          <button 
-            onClick={onStartScraper} 
-            disabled={scraperStatus === 'running'}
-            className="px-5 py-2.5 rounded-full font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
-            style={{ backgroundColor: '#6A1E55', color: 'white' }}
-          >
-            {scraperStatus === 'running' ? 'Scraper Running... (Please wait)' : scraperStatus === 'done' ? 'Scraper Finished ✓' : 'Start Job Scraping'}
-          </button>
-        </div>
-        {scraperStatus === 'running' && (
-          <p className="text-center text-white/60 text-xs mt-3">This may take several minutes. Please don't close this page.</p>
->>>>>>> 46a1eaef149893e9c722aaf740180cea9c62b523
         )}
         <div className="grid grid-cols-4 gap-4 mt-8 text-center">
           <Metric label="Jobs Found" value="247" />

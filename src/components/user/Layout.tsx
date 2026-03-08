@@ -29,8 +29,7 @@ export default function UserLayout() {
       <main className="min-h-screen">
         <Outlet />
       </main>
-      
-      {/* Chatbot */}
+
       <Chatbot isOpen={showChatbot} onClose={() => setShowChatbot(false)} />
     </div>
   );
@@ -51,5 +50,3 @@ function NavItem({ to, label }: { to: string; label: string }) {
     </NavLink>
   );
 }
-
-

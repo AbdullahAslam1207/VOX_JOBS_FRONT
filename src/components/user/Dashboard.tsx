@@ -1,10 +1,6 @@
-<<<<<<< HEAD
 import React, { useEffect, useState } from 'react';
 import { getAllJobs } from '../../api';
-=======
-import React from 'react';
 import { Link } from 'react-router-dom';
->>>>>>> 46a1eaef149893e9c722aaf740180cea9c62b523
 
 export default function UserDashboard() {
   const [jobsCount, setJobsCount] = useState<number | null>(null);
@@ -42,5 +38,3 @@ export default function UserDashboard() {
     </div>
   );
 }
-
-

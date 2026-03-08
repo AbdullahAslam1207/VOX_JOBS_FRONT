@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { getChatResponse, ChatJobCard, ChatMessage } from '../../api';
+import { getChatResponse, getVoiceWebSocketUrl, ChatJobCard, ChatMessage } from '../../api';
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -26,6 +26,14 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isVoiceConnected, setIsVoiceConnected] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string>('Voice assistant ready.');
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const inputNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -43,6 +51,17 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Clean up audio and WebSocket on unmount or when chatbot closes
+  useEffect(() => {
+    return () => {
+      stopRecording(false);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Parse bot response to extract cards from __CARDS__ marker
   function parseBotResponse(botResponse: string): { text: string; cards: ChatJobCard[] } {
@@ -169,6 +188,201 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  }
+
+  // Voice chat: establish WebSocket connection
+  function ensureWebSocket() {
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    try {
+      const wsUrl = getVoiceWebSocketUrl();
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setIsVoiceConnected(true);
+        setVoiceStatus('Connected. Tap mic to speak.');
+      };
+
+      ws.onclose = () => {
+        setIsVoiceConnected(false);
+        setVoiceStatus('Disconnected from voice assistant.');
+      };
+
+      ws.onerror = () => {
+        setIsVoiceConnected(false);
+        setVoiceStatus('Voice connection error.');
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+          playAudio(event.data);
+          return;
+        }
+
+        try {
+          const data = JSON.parse(event.data as string);
+
+          if (data.type === 'status') {
+            if (typeof data.message === 'string') {
+              setVoiceStatus(data.message);
+            }
+          }
+
+          if (data.type === 'transcription' && typeof data.text === 'string') {
+            const userMsg: Message = {
+              id: Date.now().toString(),
+              type: 'user',
+              text: data.text,
+            };
+            setMessages((prev) => [...prev, userMsg]);
+          }
+
+          if (data.type === 'response') {
+            const rawMessage: string = data.message || '';
+            const jobs: ChatJobCard[] = Array.isArray(data.jobs) ? data.jobs : [];
+
+            let messageText = rawMessage;
+            let cards: ChatJobCard[] = jobs || [];
+
+            if (messageText.includes('__CARDS__')) {
+              const parsed = parseBotResponse(messageText);
+              messageText = parsed.text;
+              if (parsed.cards.length > 0) {
+                cards = parsed.cards;
+              }
+            }
+
+            const botMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              type: 'bot',
+              text: messageText,
+              cards: cards.length > 0 ? cards : undefined,
+            };
+            setMessages((prev) => [...prev, botMsg]);
+          }
+
+          if (data.type === 'error' && typeof data.message === 'string') {
+            setVoiceStatus(`Error: ${data.message}`);
+          }
+        } catch (err) {
+          console.error('Voice WS message parse error:', err);
+        }
+      };
+    } catch (err) {
+      console.error('Failed to open voice WebSocket:', err);
+      setIsVoiceConnected(false);
+      setVoiceStatus('Failed to connect to voice assistant.');
+    }
+  }
+
+  // Float32 to PCM16 converter
+  function float32ToPCM16(float32Array: Float32Array): ArrayBuffer {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    let offset = 0;
+    for (let i = 0; i < float32Array.length; i++, offset += 2) {
+      let sample = Math.max(-1, Math.min(1, float32Array[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    }
+    return buffer;
+  }
+
+  async function startRecording() {
+    if (isRecording) return;
+
+    ensureWebSocket();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass({ sampleRate: 16000 });
+      const inputNode = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      mediaStreamRef.current = stream;
+      audioContextRef.current = audioContext;
+      inputNodeRef.current = inputNode;
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (event) => {
+        if (!isRecording) return;
+        const floatData = event.inputBuffer.getChannelData(0);
+        const pcm16 = float32ToPCM16(floatData);
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(pcm16);
+        }
+      };
+
+      inputNode.connect(processor);
+      processor.connect(audioContext.destination);
+
+      setIsRecording(true);
+      setVoiceStatus('Listening... release mic to send.');
+    } catch (err: any) {
+      console.error('Mic error:', err);
+      setVoiceStatus(`Mic error: ${err?.message || 'Unable to access microphone.'}`);
+    }
+  }
+
+  function stopRecording(sendEnd: boolean = true) {
+    if (!isRecording && !audioContextRef.current && !mediaStreamRef.current) return;
+
+    setIsRecording(false);
+
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (inputNodeRef.current) {
+      inputNodeRef.current.disconnect();
+      inputNodeRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+
+    if (sendEnd && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'end' }));
+      setVoiceStatus('Processing your message...');
+    } else {
+      setVoiceStatus(isVoiceConnected ? 'Connected. Tap mic to speak.' : 'Voice assistant ready.');
+    }
+  }
+
+  function handleVoiceButtonDown() {
+    startRecording();
+  }
+
+  function handleVoiceButtonUp() {
+    stopRecording(true);
+  }
+
+  function playAudio(audioData: Blob | ArrayBuffer) {
+    try {
+      const blob = audioData instanceof Blob ? audioData : new Blob([audioData], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.play().catch((err) => {
+        console.error('Audio play error:', err);
+        setVoiceStatus(`Audio play failed: ${err?.message || 'Unknown error'}`);
+      });
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setVoiceStatus(isVoiceConnected ? 'Connected. Tap mic to speak.' : 'Voice assistant ready.');
+      };
+    } catch (err: any) {
+      console.error('Error playing audio:', err);
+      setVoiceStatus(`Audio error: ${err?.message || 'Unknown error'}`);
     }
   }
 
@@ -300,26 +514,58 @@ export default function Chatbot({ isOpen, onClose }: ChatbotProps) {
           </div>
         )}
 
-        {/* Input */}
+        {/* Input + Voice Controls */}
         <div className="p-4 border-t border-white/10">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/40 outline-none focus:border-[#6A1E55] transition-colors"
-              disabled={loading}
-            />
-            <button
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              className="px-6 py-3 rounded-lg bg-[#6A1E55] text-white font-semibold hover:bg-[#7A2E65] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Send
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onMouseDown={handleVoiceButtonDown}
+                onMouseUp={handleVoiceButtonUp}
+                onMouseLeave={() => isRecording && handleVoiceButtonUp()}
+                disabled={loading}
+                className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
+                  isRecording
+                    ? 'bg-red-600 border-red-400 text-white'
+                    : 'bg-[#6A1E55] border-[#A64D79] text-white hover:bg-[#7A2E65]'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title="Hold to speak"
+              >
+                🎤
+              </button>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/40 outline-none focus:border-[#6A1E55] transition-colors"
+                disabled={loading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading || !input.trim()}
+                className="px-6 py-3 rounded-lg bg-[#6A1E55] text-white font-semibold hover:bg-[#7A2E65] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Send
+              </button>
+            </div>
+            <div className="text-xs text-white/60 flex items-center justify-between">
+              <span>{voiceStatus}</span>
+              <span
+                className={`flex items-center gap-1 ${
+                  isVoiceConnected ? 'text-emerald-400' : 'text-red-400'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isVoiceConnected ? 'bg-emerald-400' : 'bg-red-400'
+                  }`}
+                />
+                {isVoiceConnected ? 'Voice connected' : 'Voice disconnected'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

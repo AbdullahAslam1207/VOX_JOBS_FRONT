@@ -164,3 +164,19 @@ export function getChatResponse(query: string, user_query: ChatMessage[] = []): 
 	});
 }
 
+// Voice chat WebSocket URL (derived from CHAT_BASE_URL)
+export function getVoiceWebSocketUrl(): string {
+	try {
+		const url = new URL(CHAT_BASE_URL);
+		url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+		url.pathname = '/ws/voice_chat';
+		url.search = '';
+		url.hash = '';
+		return url.toString();
+	} catch {
+		const wsProtocol = CHAT_BASE_URL.startsWith('https') ? 'wss' : 'ws';
+		const base = CHAT_BASE_URL.replace(/^https?/, '');
+		return `${wsProtocol}${base}/ws/voice_chat`;
+	}
+}
+

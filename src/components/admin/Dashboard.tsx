@@ -1,14 +1,59 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
+import { getAllJobs, startScraperAndWait, createVectorStore } from '../../api';
 
 export default function AdminDashboard() {
+  const [starting, setStarting] = useState(false);
+  const [jobsCount, setJobsCount] = useState<number | null>(null);
+  const [vectorStatus, setVectorStatus] = useState<'idle' | 'starting' | 'running' | 'completed' | 'failed'>('idle');
+  const [vectorHttpCode, setVectorHttpCode] = useState<number | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getAllJobs();
+        setJobsCount((jobs || []).length);
+      } catch {}
+    };
+    load();
+  }, []);
+
+  const startScraper = async () => {
+    try {
+      setStarting(true);
+      await startScraperAndWait();
+      // Refresh jobs after scraper completes
+      const jobs = await getAllJobs();
+      setJobsCount((jobs || []).length);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const generateVectorStore = async () => {
+    try {
+      setVectorStatus('starting');
+      console.log('Vector store creation: starting');
+      setVectorStatus('running');
+      console.log('Vector store creation: running');
+      const code = await createVectorStore();
+      setVectorHttpCode(code);
+      console.log('Vector store creation HTTP status:', code);
+      setVectorStatus('completed');
+      console.log('Vector store creation: completed');
+    } catch (e) {
+      setVectorStatus('failed');
+      console.error('Vector store creation failed', e);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8 text-white/90">
       <h1 className="text-xl md:text-2xl font-semibold mb-5">Dashboard</h1>
 
       <div className="grid md:grid-cols-4 gap-5 mb-6">
         {[
-          { title: 'Total Jobs', value: '12,456', Icon: Briefcase, color: '#6A1E55' },
+          { title: 'Total Jobs', value: jobsCount !== null ? String(jobsCount) : '—', Icon: Briefcase, color: '#6A1E55' },
           { title: 'Active Users', value: '3,247', Icon: Users, color: '#A64D79' },
           { title: 'Applications', value: '8,921', Icon: FileStack, color: '#6A1E55' },
           { title: 'Success Rate', value: '73%', Icon: CheckCircle2, color: '#A64D79' },
@@ -29,11 +74,20 @@ export default function AdminDashboard() {
       <section className="rounded-2xl p-8 border border-[#6A1E55]/40 mb-6" style={{ background: 'radial-gradient(1000px 600px at 50% -10%, rgba(166,77,121,0.2), transparent), linear-gradient(180deg, rgba(43,22,39,0.6), rgba(19,16,34,0.6))' }}>
         <h2 className="text-2xl font-bold text-white text-center mb-1">Job Scraping Control</h2>
         <p className="text-center text-white/70 mb-6 text-sm">Manage and monitor job data collection from various sources</p>
-        <div className="flex justify-center">
-          <button className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>
-            Start Job Scraping
+        <div className="flex flex-col items-center gap-3">
+          <button onClick={startScraper} disabled={starting} className="px-5 py-2.5 rounded-full font-semibold text-sm disabled:opacity-60" style={{ backgroundColor: '#6A1E55', color: 'white' }}>
+            {starting ? 'Running scraper…' : 'Start Job Scraping'}
+          </button>
+          <button onClick={generateVectorStore} className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>
+            Generate Vector Store
           </button>
         </div>
+        {vectorStatus !== 'idle' && (
+          <div className="text-center text-white/70 mt-3 text-sm">
+            Vector store: {vectorStatus === 'starting' && 'starting'}{vectorStatus === 'running' && 'running'}{vectorStatus === 'completed' && 'completed'}{vectorStatus === 'failed' && 'failed'}
+            {vectorHttpCode !== null && ` (HTTP ${vectorHttpCode})`}
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-4 mt-8 text-center">
           <Metric label="Jobs Found" value="247" />
           <Metric label="Sources" value="15" />

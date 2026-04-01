@@ -10,6 +10,9 @@ import UserLayout from './components/user/Layout';
 import UserDashboard from './components/user/Dashboard';
 import UserJobs from './components/user/Jobs';
 import SavedJobs from './components/user/Saved';
+import UserProfile from './components/user/Profile';
+import AppliedJobs from './components/user/AppliedJobs';
+import MockInterview from './components/user/MockInterview';
 
 function App() {
   return (
@@ -29,6 +32,9 @@ function App() {
           <Route index element={<UserDashboard />} />
           <Route path="jobs" element={<UserJobs />} />
           <Route path="saved" element={<SavedJobs />} />
+          <Route path="profile" element={<UserProfile />} />
+          <Route path="applied-jobs" element={<AppliedJobs />} />
+          <Route path="mock-interview" element={<MockInterview />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

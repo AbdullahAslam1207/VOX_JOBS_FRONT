@@ -1,12 +1,44 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getAllJobs, getFavoriteJobs, getStoredUser } from '../../api';
 
 export default function UserDashboard() {
+  const [jobsCount, setJobsCount] = useState<number | null>(null);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getAllJobs();
+        setJobsCount((jobs || []).length);
+      } catch {}
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    const loadSaved = async () => {
+      if (!user?.user_id) return;
+      try {
+        const favs = await getFavoriteJobs(user.user_id);
+        setSavedCount((favs || []).length);
+      } catch {
+        setSavedCount(null);
+      }
+    };
+    loadSaved();
+  }, []);
+
   return (
     <div className="p-6 md:p-8 text-white/90">
       <h1 className="text-xl md:text-2xl font-semibold mb-5">Welcome back</h1>
 
       <div className="grid md:grid-cols-3 gap-5 mb-6">
-        {[{ t: 'Saved Jobs', v: '8' }, { t: 'Applications', v: '3' }].map((m) => (
+        {[
+          { t: 'Saved Jobs', v: savedCount !== null ? String(savedCount) : '—' },
+          { t: 'Applications', v: '3' },
+          { t: 'Total Jobs', v: jobsCount !== null ? String(jobsCount) : '—' },
+        ].map((m) => (
           <div key={m.t} className="rounded-xl p-5 border border-white/10" style={{ background: 'linear-gradient(160deg, rgba(106,30,85,0.25), rgba(19,16,34,0.6))' }}>
             <div className="text-xs text-white/70">{m.t}</div>
             <div className="text-2xl font-bold leading-tight">{m.v}</div>
@@ -18,7 +50,7 @@ export default function UserDashboard() {
         <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
         <div className="flex flex-wrap gap-3">
           <a href="/user/jobs" className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>Find Jobs</a>
-          <button className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15">Update Profile</button>
+          <a href="/user/profile" className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15">Update Profile</a>
         </div>
       </section>
     </div>

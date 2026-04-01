@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { getAllJobs, getFavoriteJobs, getStoredUser } from '../../api';
 
 export default function UserDashboard() {
   const [jobsCount, setJobsCount] = useState<number | null>(null);
   const [savedCount, setSavedCount] = useState<number | null>(null);
+=======
+import { getAllJobs } from '../../api';
+import { Link } from 'react-router-dom';
+
+export default function UserDashboard() {
+  const [jobsCount, setJobsCount] = useState<number | null>(null);
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
   useEffect(() => {
     const load = async () => {
@@ -15,6 +23,7 @@ export default function UserDashboard() {
     load();
   }, []);
 
+<<<<<<< HEAD
   useEffect(() => {
     const user = getStoredUser();
     const loadSaved = async () => {
@@ -29,16 +38,22 @@ export default function UserDashboard() {
     loadSaved();
   }, []);
 
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
   return (
     <div className="p-6 md:p-8 text-white/90">
       <h1 className="text-xl md:text-2xl font-semibold mb-5">Welcome back</h1>
 
       <div className="grid md:grid-cols-3 gap-5 mb-6">
+<<<<<<< HEAD
         {[
           { t: 'Saved Jobs', v: savedCount !== null ? String(savedCount) : '—' },
           { t: 'Applications', v: '3' },
           { t: 'Total Jobs', v: jobsCount !== null ? String(jobsCount) : '—' },
         ].map((m) => (
+=======
+        {[{ t: 'Saved Jobs', v: '8' }, { t: 'Applications', v: '3' }, { t: 'Total Jobs', v: jobsCount !== null ? String(jobsCount) : '—' }].map((m) => (
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
           <div key={m.t} className="rounded-xl p-5 border border-white/10" style={{ background: 'linear-gradient(160deg, rgba(106,30,85,0.25), rgba(19,16,34,0.6))' }}>
             <div className="text-xs text-white/70">{m.t}</div>
             <div className="text-2xl font-bold leading-tight">{m.v}</div>
@@ -50,11 +65,13 @@ export default function UserDashboard() {
         <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
         <div className="flex flex-wrap gap-3">
           <a href="/user/jobs" className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>Find Jobs</a>
+<<<<<<< HEAD
           <a href="/user/profile" className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15">Update Profile</a>
+=======
+          <Link to="/user/settings" className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15 transition-colors">Update Profile</Link>
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         </div>
       </section>
     </div>
   );
 }
-
-

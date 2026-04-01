@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 function normalizeBaseUrl(value: string | undefined, fallback: string): string {
 	const base = value?.trim() || fallback;
 	return base.replace(/\/+$/, '');
@@ -11,6 +12,11 @@ const VECTOR_STORE_BASE_URL = normalizeBaseUrl(
 	CHAT_BASE_URL
 );
 const USER_STORAGE_KEY = 'voxjobs_user';
+=======
+// Centralized API client for backend integration
+const BASE_URL = 'https://6m8wrpjs-8000.inc1.devtunnels.ms';
+const CHAT_BASE_URL = 'https://n5rrrx4s-8000.asse.devtunnels.ms';
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
 // Centralized API endpoints - change these to update all API calls
 export const API_ENDPOINTS = {
@@ -23,17 +29,21 @@ export const API_ENDPOINTS = {
 		GET_JOBS_BY_CITY: '/CRUD/get_jobs_by_city',
 		GET_JOBS_BY_TITLE: '/CRUD/get_jobs_by_title',
 	},
+<<<<<<< HEAD
 	FAVORITES: {
 		ADD: '/CRUD/favorite/add',
 		LIST: '/CRUD/favorite',
 		DELETE: '/CRUD/favorite/delete',
 	},
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 	SCRAPER: {
 		START_SCRAPER: '/Scraper/start_scraper',
 	},
 	CHAT: {
 		CHAT_RESPONSE: '/chat_response_jobs',
 	},
+<<<<<<< HEAD
 	CONVERSATION: {
 		MESSAGE: '/conversation/message',
 		JOB: '/conversation/job',
@@ -51,6 +61,10 @@ export const API_ENDPOINTS = {
 		PROFILE_PICTURE_UPLOAD: '/apply/profile-picture',
 		PROFILE_PICTURE_METADATA: '/apply/profile-picture',
 		MUSTAQBIL_CREDENTIALS: '/apply/mustaqbil-credentials',
+=======
+	VECTOR_STORE: {
+		CREATE_VECTOR_STORE: 'https://n5rrrx4s-8000.asse.devtunnels.ms/create_vector_store',
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 	},
 } as const;
 
@@ -76,6 +90,7 @@ export interface JobApi {
 	location?: string;
 	description?: string;
 	email?: string;
+<<<<<<< HEAD
 	// Optional fields we may forward when saving favorites
 	city?: string;
 	source_city?: string;
@@ -171,6 +186,8 @@ export function persistUserFromAuthResponse(res: any, fallbackEmail?: string): S
 		return stored;
 	}
 	return null;
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 }
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
@@ -183,7 +200,11 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => '');
+<<<<<<< HEAD
 		throw new Error(parseApiError(text, res.status));
+=======
+		throw new Error(text || `Request failed: ${res.status}`);
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 	}
 	// Some endpoints may return no JSON on success
 	try {
@@ -193,6 +214,7 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 	}
 }
 
+<<<<<<< HEAD
 function parseApiError(rawText: string, status: number): string {
 	if (!rawText) return `Request failed: ${status}`;
 	try {
@@ -206,6 +228,8 @@ function parseApiError(rawText: string, status: number): string {
 	return rawText;
 }
 
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 export function registerUser(data: RegisterRequest) {
 	return jsonFetch(`${BASE_URL}${API_ENDPOINTS.AUTH.REGISTER}`, {
 		method: 'POST',
@@ -256,6 +280,7 @@ export function mapUiRoleToBackend(uiRole: 'admin' | 'jobseeker'): UserRoleBacke
 	return uiRole === 'admin' ? 'Admin' : 'Job_Seeker';
 }
 
+<<<<<<< HEAD
 // Favorites types and APIs
 export interface FavoriteJobCreate {
 	user_id: number;
@@ -306,6 +331,8 @@ export function deleteFavoriteJob(favId: number, userId: number) {
 	});
 }
 
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 // Chatbot API types
 export interface ChatJobCard {
 	title: string;
@@ -314,7 +341,10 @@ export interface ChatJobCard {
 	city?: string;
 	salary?: string;
 	job_type: string;
+<<<<<<< HEAD
 	job_shift?: string;
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 	experience?: string;
 	education?: string;
 	posted_date?: string;
@@ -323,7 +353,10 @@ export interface ChatJobCard {
 	job_description?: string;
 	skills?: string;
 	job_link?: string;
+<<<<<<< HEAD
 	job_source?: string;
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 }
 
 export interface ChatMessage {
@@ -346,7 +379,10 @@ export interface ChatRequest {
 	user_query: ChatMessage[];
 }
 
+<<<<<<< HEAD
 // The upstream expects kwargs/args envelope; keep backward compatibility with prior shape.
+=======
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 export function getChatResponse(query: string, user_query: ChatMessage[] = []): Promise<ChatResponse> {
 	return jsonFetch(`${CHAT_BASE_URL}${API_ENDPOINTS.CHAT.CHAT_RESPONSE}`, {
 		method: 'POST',
@@ -355,6 +391,7 @@ export function getChatResponse(query: string, user_query: ChatMessage[] = []): 
 	});
 }
 
+<<<<<<< HEAD
 // Conversation persistence types
 export type ConversationSender = 'user' | 'llm';
 
@@ -636,5 +673,21 @@ export function getMustaqbilCredentials(email: string) {
 			cache: 'no-store',
 		}
 	);
+=======
+// Voice chat WebSocket URL (derived from CHAT_BASE_URL)
+export function getVoiceWebSocketUrl(): string {
+	try {
+		const url = new URL(CHAT_BASE_URL);
+		url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+		url.pathname = '/ws/voice_chat';
+		url.search = '';
+		url.hash = '';
+		return url.toString();
+	} catch {
+		const wsProtocol = CHAT_BASE_URL.startsWith('https') ? 'wss' : 'ws';
+		const base = CHAT_BASE_URL.replace(/^https?/, '');
+		return `${wsProtocol}${base}/ws/voice_chat`;
+	}
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 }
 

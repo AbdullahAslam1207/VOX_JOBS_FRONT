@@ -1,30 +1,66 @@
 import React, { useEffect, useState } from 'react';
 import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
+<<<<<<< HEAD
 import { getAllJobs, startScraperAndWait, createVectorStore } from '../../api';
+=======
+import { getAllJobs, getJobsByCity, startScraperAndWait, createVectorStore } from '../../api';
+import { Link } from 'react-router-dom';
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
 export default function AdminDashboard() {
   const [starting, setStarting] = useState(false);
   const [jobsCount, setJobsCount] = useState<number | null>(null);
   const [vectorStatus, setVectorStatus] = useState<'idle' | 'starting' | 'running' | 'completed' | 'failed'>('idle');
   const [vectorHttpCode, setVectorHttpCode] = useState<number | null>(null);
+<<<<<<< HEAD
+=======
+  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'>('Lahore');
+  const [cityJobs, setCityJobs] = useState<any[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
   useEffect(() => {
     const load = async () => {
       try {
         const jobs = await getAllJobs();
         setJobsCount((jobs || []).length);
+<<<<<<< HEAD
+=======
+        setAllJobs(Array.isArray(jobs) ? jobs : []);
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       } catch {}
     };
     load();
   }, []);
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const jobs = await getJobsByCity(city);
+        setCityJobs(Array.isArray(jobs) ? jobs : jobs?.jobs || []);
+      } catch {}
+    };
+    load();
+  }, [city]);
+
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
   const startScraper = async () => {
     try {
       setStarting(true);
       await startScraperAndWait();
+<<<<<<< HEAD
       // Refresh jobs after scraper completes
       const jobs = await getAllJobs();
       setJobsCount((jobs || []).length);
+=======
+      const jobs = await getAllJobs();
+      setJobsCount((jobs || []).length);
+      setAllJobs(Array.isArray(jobs) ? jobs : []);
+      const cityData = await getJobsByCity(city);
+      setCityJobs(Array.isArray(cityData) ? cityData : cityData?.jobs || []);
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
     } finally {
       setStarting(false);
     }
@@ -33,6 +69,7 @@ export default function AdminDashboard() {
   const generateVectorStore = async () => {
     try {
       setVectorStatus('starting');
+<<<<<<< HEAD
       console.log('Vector store creation: starting');
       setVectorStatus('running');
       console.log('Vector store creation: running');
@@ -41,6 +78,12 @@ export default function AdminDashboard() {
       console.log('Vector store creation HTTP status:', code);
       setVectorStatus('completed');
       console.log('Vector store creation: completed');
+=======
+      setVectorStatus('running');
+      const code = await createVectorStore();
+      setVectorHttpCode(code);
+      setVectorStatus('completed');
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
     } catch (e) {
       setVectorStatus('failed');
       console.error('Vector store creation failed', e);
@@ -84,7 +127,11 @@ export default function AdminDashboard() {
         </div>
         {vectorStatus !== 'idle' && (
           <div className="text-center text-white/70 mt-3 text-sm">
+<<<<<<< HEAD
             Vector store: {vectorStatus === 'starting' && 'starting'}{vectorStatus === 'running' && 'running'}{vectorStatus === 'completed' && 'completed'}{vectorStatus === 'failed' && 'failed'}
+=======
+            Vector store: {vectorStatus}
+>>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
             {vectorHttpCode !== null && ` (HTTP ${vectorHttpCode})`}
           </div>
         )}
@@ -93,6 +140,55 @@ export default function AdminDashboard() {
           <Metric label="Sources" value="15" />
           <Metric label="Success Rate" value="98%" />
           <Metric label="Avg Time" value="3m" />
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Jobs by City</h3>
+          <select value={city} onChange={(e)=>setCity(e.target.value as any)} className="bg-white/10 text-white text-sm rounded-md px-3 py-2 border border-white/10">
+            <option value="Lahore">Lahore</option>
+            <option value="Karachi">Karachi</option>
+            <option value="Islamabad">Islamabad</option>
+            <option value="Rawalpindi">Rawalpindi</option>
+          </select>
+        </div>
+        <div className="auth-scroll max-h-64 overflow-y-auto space-y-2 pr-2">
+          {cityJobs.length === 0 ? (
+            <div className="text-white/60 text-sm">No jobs found.</div>
+          ) : (
+            cityJobs.map((j:any, idx:number) => (
+              <div key={idx} className="rounded-lg p-3 border border-white/10 bg-white/5">
+                <div className="font-semibold text-sm">{j.title || j.jobTitle || 'Job'}</div>
+                <div className="text-white/70 text-xs">{j.company || j.companyName || 'Company'} — {j.city || city}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <h3 className="text-lg font-semibold mb-3">All Jobs</h3>
+        <div className="auth-scroll max-h-64 overflow-y-auto space-y-2 pr-2">
+          {allJobs.length === 0 ? (
+            <div className="text-white/60 text-sm">No jobs available.</div>
+          ) : (
+            allJobs.map((j:any, idx:number) => (
+              <div key={idx} className="rounded-lg p-3 border border-white/10 bg-white/5">
+                <div className="font-semibold text-sm">{j.title || j.jobTitle || 'Job'}</div>
+                <div className="text-white/70 text-xs">{j.company || j.companyName || 'Company'} — {j.city || j.location || ''}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl p-6 border border-white/10 mb-6" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.7), rgba(19,16,34,0.4))' }}>
+        <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <Link to="/admin/settings" className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15 transition-colors">Settings</Link>
+          <button className="px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: '#6A1E55', color: 'white' }}>Manage Users</button>
+          <button className="px-5 py-2.5 rounded-full font-semibold text-sm bg-white/10 hover:bg-white/15">View Analytics</button>
         </div>
       </section>
 
@@ -130,5 +226,3 @@ function Metric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-

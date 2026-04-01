@@ -69,13 +69,13 @@ export default function LandingPage() {
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" style={{ backgroundColor: '#3B1C32', opacity: 0.35 }}></div>
         <div className="absolute bottom-0 right-0 w-[520px] h-[520px] rounded-full blur-3xl" style={{ backgroundColor: '#6A1E55', opacity: 0.3 }}></div>
         <div className="absolute top-1/3 right-1/3 w-72 h-72 rounded-full blur-3xl" style={{ backgroundColor: '#A64D79', opacity: 0.25 }}></div>
-      </div>
+            </div>
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="VoxJobs" className="w-16 h-16 object-contain" />
           <span className="text-2xl md:text-3xl font-bold text-white">VoxJobs</span>
-        </div>
+          </div>
         <div />
       </header>
 
@@ -107,7 +107,7 @@ export default function LandingPage() {
             <div className="mb-6">
               <h2 className="text-white text-2xl font-bold">Welcome</h2>
               <p className="text-white/70">Choose your role to continue</p>
-            </div>
+          </div>
 
             {/* Role first */}
             <RoleSelector selectedRole={selectedRole} onRoleChange={setSelectedRole as any} />
@@ -130,7 +130,7 @@ export default function LandingPage() {
                 <div className="flex gap-2 mt-4 mb-6 bg-purple-900/30 rounded-lg p-2">
                   <TabButton active={activeTab === 'login'} onClick={() => setActiveTab('login')}>Login</TabButton>
                   <TabButton active={activeTab === 'signup'} onClick={() => setActiveTab('signup')}>Sign Up</TabButton>
-                </div>
+          </div>
                 {activeTab === 'login' ? (
                   <LoginForm selectedRole={'jobseeker'} />
                 ) : (
@@ -138,7 +138,7 @@ export default function LandingPage() {
                 )}
               </>
             )}
-          </div>
+        </div>
         </aside>
       </main>
     </div>

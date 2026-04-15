@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { deleteFavoriteJob, getFavoriteJobs, getStoredUser } from '../../api';
+import { deleteFavoriteJob, getApplyRunStatus, getFavoriteJobs, getStoredUser, startApplyRun } from '../../api';
 
 type Job = {
   id: string;
@@ -7,7 +7,7 @@ type Job = {
   company: string;
   location: string;
   description: string;
-  email?: string;
+  job_link?: string;
 };
 
 type SavedEntry = {
@@ -19,6 +19,9 @@ export default function SavedJobs() {
   const [savedMap, setSavedMap] = useState<Record<string, SavedEntry>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [applying, setApplying] = useState<Record<string, boolean>>({});
+  const [applyStatus, setApplyStatus] = useState<Record<string, string>>({});
+  const [applyAllLoading, setApplyAllLoading] = useState(false);
   const user = getStoredUser();
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export default function SavedJobs() {
               company: f.company_name || 'Unknown',
               location: f.location || f.city || '',
               description: f.job_description || '',
-              email: f.job_link || undefined,
+              job_link: f.job_link || undefined,
             },
           };
           return acc;
@@ -74,21 +77,87 @@ export default function SavedJobs() {
     }
   }
 
-  function applyAll() {
-    if (savedJobs.length === 0) return;
-    const subject = encodeURIComponent('Application: Multiple roles - VoxJobs');
-    const lines = savedJobs.map((j) => `- ${j.title} at ${j.company} (${j.location})`).join('\n');
-    const body = encodeURIComponent(
-      `Hello Hiring Team,\n\nI would like to apply to the following roles:\n\n${lines}\n\nMy background aligns well with these positions. Looking forward to your response.\n\nBest regards,\nYour Name\n`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  function isValidUrl(value: string) {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function applySavedJob(job: Job) {
+    if (!user?.email) {
+      setError('Please login to apply to saved jobs.');
+      return;
+    }
+
+    const key = job.job_link || job.id;
+    if (!job.job_link || !isValidUrl(job.job_link)) {
+      setApplyStatus((prev) => ({ ...prev, [key]: 'failed' }));
+      return;
+    }
+
+    setApplying((prev) => ({ ...prev, [key]: true }));
+    setApplyStatus((prev) => ({ ...prev, [key]: 'queued' }));
+
+    try {
+      const run = await startApplyRun({
+        email: user.email,
+        url: job.job_link,
+        job_title: job.title,
+        company_name: job.company,
+      });
+
+      const maxAttempts = 20;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        await sleep(2500);
+        const statusRes = await getApplyRunStatus(run.run_id);
+        const status = statusRes.status;
+        setApplyStatus((prev) => ({ ...prev, [key]: status }));
+        if (status === 'success' || status === 'failed' || status === 'timeout') {
+          break;
+        }
+      }
+    } catch {
+      setApplyStatus((prev) => ({ ...prev, [key]: 'failed' }));
+    } finally {
+      setApplying((prev) => ({ ...prev, [key]: false }));
+    }
+  }
+
+  async function applyAll() {
+    if (savedJobs.length === 0 || applyAllLoading) return;
+    if (!user?.email) {
+      setError('Please login to apply to saved jobs.');
+      return;
+    }
+
+    setError('');
+    setApplyAllLoading(true);
+    try {
+      await Promise.allSettled(savedJobs.map((job) => applySavedJob(job)));
+    } finally {
+      setApplyAllLoading(false);
+    }
   }
 
   return (
     <div className="p-6 md:p-8 text-white/90">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl md:text-2xl font-semibold">Saved Jobs</h1>
-        <button onClick={applyAll} className="px-4 py-2 rounded-md text-sm font-semibold" style={{ backgroundColor: '#6A1E55', color: 'white' }} disabled={savedJobs.length === 0}>Apply to All</button>
+        <button
+          onClick={applyAll}
+          className="px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-60"
+          style={{ backgroundColor: '#6A1E55', color: 'white' }}
+          disabled={savedJobs.length === 0 || applyAllLoading}
+        >
+          {applyAllLoading ? 'Applying to all...' : 'Apply to All'}
+        </button>
       </div>
 
       {loading && <div className="text-white/70 mb-3">Loading your saved jobs…</div>}
@@ -108,6 +177,14 @@ export default function SavedJobs() {
                 <button onClick={() => remove(entry.job.id)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white/10 hover:bg-white/15" aria-label="Remove from saved">🗑️</button>
               </div>
               <p className="text-white/80 text-sm mt-3">{entry.job.description}</p>
+              {applyStatus[entry.job.id] && (
+                <div className="mt-3 text-xs text-white/70">
+                  Apply status: <span className="font-semibold">{applyStatus[entry.job.id]}</span>
+                </div>
+              )}
+              {applying[entry.job.id] && (
+                <div className="mt-2 text-xs text-white/60">Processing application...</div>
+              )}
             </div>
           ))}
         </div>

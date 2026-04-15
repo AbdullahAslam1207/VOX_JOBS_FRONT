@@ -35,7 +35,6 @@ export default function MockInterview() {
   const [socketState, setSocketState] = useState<'connected' | 'disconnected'>('disconnected');
   const [statusText, setStatusText] = useState('Ready. Start an interview first.');
   const [targetField, setTargetField] = useState('');
-  const [maxRounds, setMaxRounds] = useState(5);
   const [isRecording, setIsRecording] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [scoreCard, setScoreCard] = useState<ScorePayload | null>(null);
@@ -383,7 +382,7 @@ export default function MockInterview() {
     sendSocketJson({
       action: 'start_interview',
       target_field: targetField.trim() || 'General',
-      max_rounds: maxRounds,
+      max_rounds: 1,
     });
   };
 
@@ -416,22 +415,13 @@ export default function MockInterview() {
           </span>
         </div>
 
-        <div className="grid md:grid-cols-[1fr_150px_180px] gap-3 p-4 md:p-5 border-b border-white/10 bg-black/5">
+        <div className="grid md:grid-cols-[1fr_180px] gap-3 p-4 md:p-5 border-b border-white/10 bg-black/5">
           <input
             value={targetField}
             onChange={(event) => setTargetField(event.target.value)}
             placeholder="Target field (e.g. Data Scientist, Backend Engineer)"
             className="px-3 py-2.5 rounded-lg border border-white/15 bg-[#171325] text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#A64D79]/60"
           />
-          <select
-            value={maxRounds}
-            onChange={(event) => setMaxRounds(Number(event.target.value))}
-            className="px-3 py-2.5 rounded-lg border border-white/15 bg-[#171325] text-white focus:outline-none focus:ring-2 focus:ring-[#A64D79]/60"
-          >
-            <option value={3}>3 rounds</option>
-            <option value={5}>5 rounds</option>
-            <option value={7}>7 rounds</option>
-          </select>
           <button
             onClick={startInterview}
             className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-[#6A1E55] hover:bg-[#7A2E65] transition-colors"

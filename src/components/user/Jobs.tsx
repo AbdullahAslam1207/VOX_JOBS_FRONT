@@ -340,7 +340,7 @@ export default function UserJobs() {
           is_active: true,
         };
         const res = await addFavoriteJob(payload);
-        const favoriteId = res?.favorite_id ?? res?.favoriteId ?? Date.now();
+        const favoriteId = res?.favorite_id ?? Date.now();
         setSaved((prev) => ({
           ...prev,
           [key]: { favoriteId, job },

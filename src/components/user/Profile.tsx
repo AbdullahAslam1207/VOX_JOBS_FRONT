@@ -189,17 +189,17 @@ export default function UserProfile() {
   return (
     <div className="p-6 md:p-8 text-white/90">
       <ErrorPopup message={popupError} onClose={() => setPopupError('')} />
-      <h1 className="text-xl md:text-2xl font-semibold mb-5">Profile</h1>
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-5">Profile Settings</h1>
 
-      <section className="rounded-2xl p-6 border border-white/10 mb-6 bg-white/5">
-        <h2 className="text-lg font-semibold mb-4">Update Profile</h2>
+      <section className="rounded-2xl p-6 border border-white/10 mb-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm shadow-xl shadow-black/10">
+        <h2 className="text-lg font-semibold mb-4 text-white">Update Profile</h2>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-white/70 mb-1">Full Name</label>
             <input
               value={fullname}
               onChange={(e) => setFullname(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="Your full name"
             />
           </div>
@@ -208,7 +208,7 @@ export default function UserProfile() {
             <input
               value={user?.email || ''}
               readOnly
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none opacity-70"
+              className="w-full rounded-md bg-[#171325] border border-white/10 px-3 py-2.5 outline-none opacity-70"
             />
           </div>
           <div>
@@ -216,7 +216,7 @@ export default function UserProfile() {
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="03xx-xxxxxxx"
             />
           </div>
@@ -225,7 +225,7 @@ export default function UserProfile() {
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="Lahore"
             />
           </div>
@@ -234,22 +234,22 @@ export default function UserProfile() {
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none min-h-24"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none min-h-24 focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="Short profile summary"
             />
           </div>
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <button onClick={saveProfile} className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white">
+          <button onClick={saveProfile} className="px-4 py-2 rounded-md text-sm font-semibold bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] text-white shadow-md shadow-[#6A1E55]/25 transition-all duration-200">
             Save Profile
           </button>
           {profileMsg && <span className="text-sm text-emerald-300">{profileMsg}</span>}
         </div>
       </section>
 
-      <section className="rounded-2xl p-6 border border-white/10 bg-white/5">
-        <h2 className="text-lg font-semibold mb-4">Mustaqbil Credentials</h2>
+      <section className="rounded-2xl p-6 border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm shadow-xl shadow-black/10">
+        <h2 className="text-lg font-semibold mb-4 text-white">Mustaqbil Credentials</h2>
 
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           <div>
@@ -257,7 +257,7 @@ export default function UserProfile() {
             <input
               value={mustaqbilEmail}
               onChange={(e) => setMustaqbilEmail(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="name@example.com"
             />
           </div>
@@ -267,7 +267,7 @@ export default function UserProfile() {
               type="password"
               value={mustaqbilPassword}
               onChange={(e) => setMustaqbilPassword(e.target.value)}
-              className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 outline-none"
+              className="w-full rounded-md bg-[#171325] border border-white/15 px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#A64D79]/60 focus:border-[#A64D79]/50 transition-all"
               placeholder="Enter password"
             />
           </div>
@@ -277,14 +277,14 @@ export default function UserProfile() {
           <button
             onClick={onSaveMustaqbilCredentials}
             disabled={mustaqbilSaving}
-            className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white disabled:opacity-60"
+            className="px-4 py-2 rounded-md text-sm font-semibold bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] text-white disabled:opacity-60 shadow-md shadow-[#6A1E55]/25 transition-all duration-200"
           >
             {mustaqbilSaving ? 'Saving...' : 'Save Mustaqbil Credentials'}
           </button>
           {mustaqbilMsg && <span className="text-sm text-emerald-300">{mustaqbilMsg}</span>}
         </div>
 
-        <h2 className="text-lg font-semibold mb-4">Profile Picture</h2>
+        <h2 className="text-lg font-semibold mb-4 text-white">Profile Picture</h2>
 
         <div className="flex flex-col md:flex-row md:items-center gap-3 mb-5">
           <input
@@ -296,7 +296,7 @@ export default function UserProfile() {
           <button
             onClick={onUploadProfilePicture}
             disabled={profilePictureLoading}
-            className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white disabled:opacity-60"
+            className="px-4 py-2 rounded-md text-sm font-semibold bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] text-white disabled:opacity-60 shadow-md shadow-[#6A1E55]/25 transition-all duration-200"
           >
             {profilePictureLoading ? 'Uploading...' : 'Upload Picture'}
           </button>
@@ -314,7 +314,7 @@ export default function UserProfile() {
 
         {profilePictureMsg && <div className="mb-5 text-sm text-emerald-300">{profilePictureMsg}</div>}
 
-        <h2 className="text-lg font-semibold mb-4">Resume</h2>
+        <h2 className="text-lg font-semibold mb-4 text-white">Resume</h2>
 
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <input
@@ -326,7 +326,7 @@ export default function UserProfile() {
           <button
             onClick={onUploadResume}
             disabled={resumeLoading}
-            className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white disabled:opacity-60"
+            className="px-4 py-2 rounded-md text-sm font-semibold bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] text-white disabled:opacity-60 shadow-md shadow-[#6A1E55]/25 transition-all duration-200"
           >
             {resumeLoading ? 'Uploading...' : 'Upload Resume'}
           </button>

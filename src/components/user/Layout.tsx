@@ -44,6 +44,24 @@ export default function UserLayout() {
             <div className="text-xs text-white/60">Job Seeker</div>
           </div>
         </div>
+        <div className="mx-4 mt-4 p-3 rounded-xl border border-white/10 bg-white/5 flex items-center gap-3">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover border border-[#A64D79]/50 shadow-md shadow-[#6A1E55]/30"
+              onError={() => setAvatarUrl('')}
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A1E55] to-[#A64D79] text-white text-sm font-semibold flex items-center justify-center shadow-md shadow-[#6A1E55]/30">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-white truncate">{displayName}</div>
+            <div className="text-[11px] text-white/60">Profile active</div>
+          </div>
+        </div>
         <nav className="px-4 py-4 space-y-2">
           <NavItem to="." label="Dashboard" />
           <NavItem to="jobs" label="Browse Jobs" />
@@ -59,21 +77,21 @@ export default function UserLayout() {
         <header className="h-16 px-6 md:px-8 border-b border-white/10 flex items-center justify-end">
           <button
             onClick={() => setShowMenu(true)}
-            className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 text-white text-sm font-medium flex items-center gap-2"
+            className="px-3 py-2 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-white text-sm font-medium flex items-center gap-2 transition-all duration-200"
           >
             {avatarUrl ? (
               <img
                 src={avatarUrl}
                 alt="Profile"
-                className="w-7 h-7 rounded-full object-cover border border-white/20"
+                className="w-8 h-8 rounded-full object-cover border border-[#A64D79]/50 shadow-sm shadow-[#6A1E55]/30"
                 onError={() => setAvatarUrl('')}
               />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-[#6A1E55] text-white text-xs font-semibold flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6A1E55] to-[#A64D79] text-white text-xs font-semibold flex items-center justify-center shadow-sm shadow-[#6A1E55]/30">
                 {initials}
               </div>
             )}
-            <span>{displayName}</span>
+            <span className="max-w-[140px] truncate">{displayName}</span>
             <span>▸</span>
           </button>
         </header>

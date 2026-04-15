@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-<<<<<<< HEAD
 import ErrorPopup from './ErrorPopup';
 import {
   addFavoriteJob,
@@ -13,9 +12,6 @@ import {
   JobApi,
   startApplyRun,
 } from '../../api';
-=======
-import { getAllJobs, getJobsByCity, getJobsByTitle, JobApi } from '../../api';
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
 type Job = {
   id: string;
@@ -38,14 +34,11 @@ type Job = {
   job_link?: string;
 };
 
-<<<<<<< HEAD
 type SavedEntry = {
   favoriteId: number;
   job: Job;
 };
 
-=======
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 export default function UserJobs() {
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
@@ -54,24 +47,12 @@ export default function UserJobs() {
   const [loading, setLoading] = useState(false);
   const [onlyRemote, setOnlyRemote] = useState(false);
   const [listening, setListening] = useState(false);
-<<<<<<< HEAD
   const [saved, setSaved] = useState<Record<string, SavedEntry>>({});
   const [saveLoading, setSaveLoading] = useState<string | null>(null);
   const [applying, setApplying] = useState<Record<string, boolean>>({});
   const [applyStatus, setApplyStatus] = useState<Record<string, string>>({});
   const [popupError, setPopupError] = useState('');
   const recognitionRef = useRef<any | null>(null);
-=======
-  const [saved, setSaved] = useState<Record<string, Job>>(() => {
-    try {
-      const s = localStorage.getItem('voxjobs_saved_jobs');
-      return s ? JSON.parse(s) : {};
-    } catch {
-      return {};
-    }
-  });
-  const recognitionRef = useRef<any>(null);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const user = getStoredUser();
 
@@ -108,7 +89,6 @@ export default function UserJobs() {
       try {
         setLoading(true);
         const data = await getAllJobs();
-<<<<<<< HEAD
         const norm: Job[] = (data || []).map((d: JobApi) => {
           const id = String(d.id ?? Math.random());
           return {
@@ -131,16 +111,6 @@ export default function UserJobs() {
             job_link: d.job_link ?? id,
           };
         });
-=======
-        const norm: Job[] = (data || []).map((d: JobApi) => ({
-          id: String(d.id ?? Math.random()),
-          title: d.title || 'Untitled',
-          company: d.company || 'Unknown',
-          location: d.location || '',
-          description: d.description || '',
-          email: d.email,
-        }));
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         setJobs(norm);
       } catch (e) {
         // ignore
@@ -152,15 +122,11 @@ export default function UserJobs() {
   }, []);
 
   useEffect(() => {
-<<<<<<< HEAD
     const controller = new AbortController();
-=======
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
     const t = setTimeout(async () => {
       try {
         if (!query.trim()) return;
         const res = await getJobsByTitle(query.trim());
-<<<<<<< HEAD
         const norm: Job[] = (res || []).map((d: JobApi) => {
           const id = String(d.id ?? Math.random());
           return {
@@ -183,29 +149,15 @@ export default function UserJobs() {
             job_link: d.job_link ?? id,
           };
         });
-=======
-        const norm: Job[] = (res || []).map((d: JobApi) => ({
-          id: String(d.id ?? Math.random()),
-          title: d.title || 'Untitled',
-          company: d.company || 'Unknown',
-          location: d.location || '',
-          description: d.description || '',
-          email: d.email,
-        }));
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         setJobs(norm);
       } catch {
         // ignore
       }
     }, 400);
-<<<<<<< HEAD
     return () => {
       controller.abort();
       clearTimeout(t);
     };
-=======
-    return () => clearTimeout(t);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
   }, [query]);
 
   useEffect(() => {
@@ -214,7 +166,6 @@ export default function UserJobs() {
         if (!city) return;
         setLoading(true);
         const res = await getJobsByCity(city as any);
-<<<<<<< HEAD
         const norm: Job[] = (res || []).map((d: JobApi) => {
           const id = String(d.id ?? Math.random());
           return {
@@ -237,16 +188,6 @@ export default function UserJobs() {
             job_link: d.job_link ?? id,
           };
         });
-=======
-        const norm: Job[] = (res || []).map((d: JobApi) => ({
-          id: String(d.id ?? Math.random()),
-          title: d.title || 'Untitled',
-          company: d.company || 'Unknown',
-          location: d.location || '',
-          description: d.description || '',
-          email: d.email,
-        }));
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         setJobs(norm);
       } catch {
         // ignore

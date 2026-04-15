@@ -1,66 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
-<<<<<<< HEAD
-import { getAllJobs, startScraperAndWait, createVectorStore } from '../../api';
-=======
-import { getAllJobs, getJobsByCity, startScraperAndWait, createVectorStore } from '../../api';
 import { Link } from 'react-router-dom';
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
+import { Briefcase, Users, FileStack, CheckCircle2 } from 'lucide-react';
+import { getAllJobs, startScraperAndWait, createVectorStore } from '../../api';
 
 export default function AdminDashboard() {
   const [starting, setStarting] = useState(false);
   const [jobsCount, setJobsCount] = useState<number | null>(null);
   const [vectorStatus, setVectorStatus] = useState<'idle' | 'starting' | 'running' | 'completed' | 'failed'>('idle');
   const [vectorHttpCode, setVectorHttpCode] = useState<number | null>(null);
-<<<<<<< HEAD
-=======
-  const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'>('Lahore');
+  const [city, setCity] = useState('Lahore');
   const [cityJobs, setCityJobs] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
   useEffect(() => {
     const load = async () => {
       try {
         const jobs = await getAllJobs();
         setJobsCount((jobs || []).length);
-<<<<<<< HEAD
-=======
-        setAllJobs(Array.isArray(jobs) ? jobs : []);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
-      } catch {}
-    };
-    load();
-  }, []);
-
-<<<<<<< HEAD
-=======
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const jobs = await getJobsByCity(city);
-        setCityJobs(Array.isArray(jobs) ? jobs : jobs?.jobs || []);
+        setAllJobs(jobs || []);
+        // Filter jobs by city
+        const filtered = (jobs || []).filter((j: any) => (j.city || '') === city);
+        setCityJobs(filtered);
       } catch {}
     };
     load();
   }, [city]);
 
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
   const startScraper = async () => {
     try {
       setStarting(true);
       await startScraperAndWait();
-<<<<<<< HEAD
       // Refresh jobs after scraper completes
       const jobs = await getAllJobs();
       setJobsCount((jobs || []).length);
-=======
-      const jobs = await getAllJobs();
-      setJobsCount((jobs || []).length);
-      setAllJobs(Array.isArray(jobs) ? jobs : []);
-      const cityData = await getJobsByCity(city);
-      setCityJobs(Array.isArray(cityData) ? cityData : cityData?.jobs || []);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
     } finally {
       setStarting(false);
     }
@@ -69,7 +41,6 @@ export default function AdminDashboard() {
   const generateVectorStore = async () => {
     try {
       setVectorStatus('starting');
-<<<<<<< HEAD
       console.log('Vector store creation: starting');
       setVectorStatus('running');
       console.log('Vector store creation: running');
@@ -78,12 +49,6 @@ export default function AdminDashboard() {
       console.log('Vector store creation HTTP status:', code);
       setVectorStatus('completed');
       console.log('Vector store creation: completed');
-=======
-      setVectorStatus('running');
-      const code = await createVectorStore();
-      setVectorHttpCode(code);
-      setVectorStatus('completed');
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
     } catch (e) {
       setVectorStatus('failed');
       console.error('Vector store creation failed', e);
@@ -127,11 +92,7 @@ export default function AdminDashboard() {
         </div>
         {vectorStatus !== 'idle' && (
           <div className="text-center text-white/70 mt-3 text-sm">
-<<<<<<< HEAD
             Vector store: {vectorStatus === 'starting' && 'starting'}{vectorStatus === 'running' && 'running'}{vectorStatus === 'completed' && 'completed'}{vectorStatus === 'failed' && 'failed'}
-=======
-            Vector store: {vectorStatus}
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
             {vectorHttpCode !== null && ` (HTTP ${vectorHttpCode})`}
           </div>
         )}

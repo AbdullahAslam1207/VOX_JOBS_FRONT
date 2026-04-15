@@ -2,11 +2,7 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
-<<<<<<< HEAD
 import { loginUser, mapUiRoleToBackend, persistUserFromAuthResponse, setStoredUser } from '../../api';
-=======
-import { loginUser, mapUiRoleToBackend } from '../../api';
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
 const LoginForm = ({ selectedRole }) => {
   const [email, setEmail] = useState('');
@@ -19,16 +15,12 @@ const LoginForm = ({ selectedRole }) => {
       setError('');
       setLoading(true);
       const role = mapUiRoleToBackend(selectedRole);
-<<<<<<< HEAD
       const res = await loginUser({ email, password, role });
       // Persist user details; ensure we keep email even if API omits it
       const stored = persistUserFromAuthResponse(res, email);
       if (!stored || !stored.email) {
         setStoredUser({ ...(stored || {}), email, role, user_id: stored?.user_id ?? res?.user_id ?? res?.id });
       }
-=======
-      await loginUser({ email, password, role });
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       if (selectedRole === 'admin') {
         window.location.href = '/admin';
       } else {
@@ -36,10 +28,7 @@ const LoginForm = ({ selectedRole }) => {
       }
     } catch (e: any) {
       const errorMessage = e?.message || '';
-<<<<<<< HEAD
       // Provide user-friendly error messages
-=======
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('detail')) {
         setError('Invalid email or password. Please check your credentials and try again.');
       } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
@@ -49,10 +38,7 @@ const LoginForm = ({ selectedRole }) => {
       } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server')) {
         setError('Server error. Please try again later.');
       } else if (errorMessage) {
-<<<<<<< HEAD
         // If it's a user-friendly message, use it; otherwise show generic error
-=======
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         setError(errorMessage.length < 100 ? errorMessage : 'Login failed. Please try again.');
       } else {
         setError('Unable to connect. Please check your internet connection and try again.');

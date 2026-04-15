@@ -2,11 +2,7 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
-<<<<<<< HEAD
 import { registerUser, mapUiRoleToBackend, persistUserFromAuthResponse, setStoredUser } from '../../api';
-=======
-import { registerUser, mapUiRoleToBackend } from '../../api';
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
 const SignupForm = ({ selectedRole }) => {
   const [fullName, setFullName] = useState('');
@@ -29,7 +25,6 @@ const SignupForm = ({ selectedRole }) => {
       }
       setLoading(true);
       const role = mapUiRoleToBackend('jobseeker');
-<<<<<<< HEAD
       const res = await registerUser({ fullname: fullName, email, password, role });
       // Persist user details if available; otherwise store minimal info
       const stored = persistUserFromAuthResponse(res, email);
@@ -40,12 +35,6 @@ const SignupForm = ({ selectedRole }) => {
     } catch (e: any) {
       const errorMessage = e?.message || '';
       // Provide user-friendly error messages
-=======
-      await registerUser({ fullname: fullName, email, password, role });
-      window.location.href = '/user';
-    } catch (e: any) {
-      const errorMessage = e?.message || '';
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('detail')) {
         setError('Unable to create account. Please try again.');
       } else if (errorMessage.includes('409') || errorMessage.includes('Conflict') || errorMessage.includes('already exists') || errorMessage.includes('already registered')) {
@@ -57,10 +46,7 @@ const SignupForm = ({ selectedRole }) => {
       } else if (errorMessage.includes('email') && errorMessage.includes('invalid')) {
         setError('Please enter a valid email address.');
       } else if (errorMessage) {
-<<<<<<< HEAD
         // If it's a user-friendly message, use it; otherwise show generic error
-=======
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         setError(errorMessage.length < 100 ? errorMessage : 'Unable to create account. Please try again.');
       } else {
         setError('Unable to connect. Please check your internet connection and try again.');

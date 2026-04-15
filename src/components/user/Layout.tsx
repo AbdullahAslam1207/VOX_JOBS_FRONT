@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import Chatbot from '../landingpage/Chatbot';
@@ -34,14 +33,6 @@ export default function UserLayout() {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'U';
-=======
-import React, { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import Chatbot from '../landingpage/Chatbot';
-
-export default function UserLayout() {
-  const [showChatbot, setShowChatbot] = useState(false);
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
 
   return (
     <div className="min-h-screen w-full grid grid-cols-[260px_1fr]" style={{ background: 'radial-gradient(1200px 800px at 70% 0%, rgba(166,77,121,0.15), transparent 60%), radial-gradient(800px 600px at 0% 100%, rgba(106,30,85,0.15), transparent 60%)', backgroundColor: '#120f16' }}>
@@ -57,20 +48,12 @@ export default function UserLayout() {
           <NavItem to="." label="Dashboard" />
           <NavItem to="jobs" label="Browse Jobs" />
           <NavItem to="saved" label="Saved Jobs" />
-<<<<<<< HEAD
           <NavItem to="applied-jobs" label="Applied Jobs" />
           <NavItem to="mock-interview" label="Mock Interview" />
-=======
-          <NavItem to="settings" label="Settings" />
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
         </nav>
         <button onClick={() => setShowChatbot(true)} className="mx-4 mt-4 w-[calc(100%-2rem)] px-4 py-3 rounded-lg font-medium text-sm bg-[#6A1E55] hover:bg-[#7A2E65] text-white transition-colors">
           💬 Chat with Assistant
         </button>
-<<<<<<< HEAD
-=======
-        <button onClick={() => (window.location.href = '/')} className="mt-auto w-full text-left px-4 py-6 text-sm text-white/80 hover:text-white/100">Logout</button>
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       </aside>
       <main className="min-h-screen flex flex-col">
         <header className="h-16 px-6 md:px-8 border-b border-white/10 flex items-center justify-end">
@@ -151,12 +134,8 @@ export default function UserLayout() {
           <Outlet />
         </div>
       </main>
-<<<<<<< HEAD
       
       {/* Chatbot */}
-=======
-
->>>>>>> 6f783d3fa3c3bd8ab72097364a0bf8337a445d20
       <Chatbot isOpen={showChatbot} onClose={() => setShowChatbot(false)} />
     </div>
   );

@@ -23,6 +23,7 @@ const CONVERSATION_STORAGE_KEY = 'voxjobs_conversation_id';
 const VOICE_WS_PATH = '/ws/voice_chat';
 const VOICE_SILENCE_DURATION = 1800;
 const VOICE_AUDIO_THRESHOLD = 0.01;
+const VOICE_WS_CONNECT_TIMEOUT_MS = 8000;
 
 type VoiceSocketMessage = {
 	type?: string;
@@ -214,14 +215,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 
 	const voiceWsUrl = useMemo(() => {
 		const explicitSocketUrl = (import.meta.env.VITE_VOICE_CHAT_WS_URL as string | undefined)?.trim();
+		const chatBackendHttp = (import.meta.env.VITE_CHAT_BACKEND_URL as string | undefined)?.trim();
 		const backendHttp = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim() || 'http://localhost:8000';
 		if (explicitSocketUrl) return explicitSocketUrl;
+		if (chatBackendHttp) {
+			try {
+				const parsed = new URL(chatBackendHttp.replace(/\/+$/, ''));
+				const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+				return `${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`;
+			} catch {
+				// fall through
+			}
+		}
 		try {
 			const parsed = new URL(backendHttp.replace(/\/+$/, ''));
 			const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
 			return `${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`;
 		} catch {
-			return `ws://localhost:8000${VOICE_WS_PATH}`;
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			return `${protocol}//${window.location.host}${VOICE_WS_PATH}`;
 		}
 	}, []);
 
@@ -620,8 +632,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 		return await new Promise<WebSocket>((resolve, reject) => {
 			const ws = new WebSocket(voiceWsUrl);
 			wsRef.current = ws;
+			let settled = false;
+			const timeout = window.setTimeout(() => {
+				if (settled) return;
+				settled = true;
+				try {
+					ws.close();
+				} catch {
+					// ignore
+				}
+				reject(new Error('Voice server timeout. Please try again.'));
+			}, VOICE_WS_CONNECT_TIMEOUT_MS);
 
-			ws.onopen = () => resolve(ws);
+			ws.onopen = () => {
+				if (settled) return;
+				settled = true;
+				window.clearTimeout(timeout);
+				resolve(ws);
+			};
 
 			ws.onmessage = (event) => {
 				if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
@@ -651,6 +679,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 			};
 
 			ws.onerror = () => {
+				if (settled) return;
+				settled = true;
+				window.clearTimeout(timeout);
 				setLoadingReply(false);
 				reject(new Error('Voice websocket connection failed.'));
 			};
@@ -659,6 +690,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 				wsRef.current = null;
 				setIsVoiceListening(false);
 				isVoiceListeningRef.current = false;
+				if (!settled) {
+					settled = true;
+					window.clearTimeout(timeout);
+					reject(new Error('Voice websocket closed before connecting.'));
+				}
 			};
 		});
 	}, [appendBotReply, appendUserMessage, playAudio, voiceWsUrl]);

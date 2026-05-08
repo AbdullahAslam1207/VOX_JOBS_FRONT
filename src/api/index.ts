@@ -17,6 +17,9 @@ export const API_ENDPOINTS = {
 	AUTH: {
 		REGISTER: '/auth/register',
 		LOGIN: '/auth/login',
+		PROFILE: '/auth/profile',
+		PASSWORD: '/auth/password',
+		USERS: '/auth/users',
 	},
 	CRUD: {
 		GET_JOBS: '/CRUD/Get_jobs',
@@ -67,6 +70,33 @@ export interface LoginRequest {
 	email: string;
 	password: string;
 	role: UserRoleBackend;
+}
+
+export interface UserProfileResponse {
+	user_id: number;
+	fullname: string;
+	email: string;
+	role: string;
+}
+
+export interface UpdateUserProfileRequest {
+	current_email: string;
+	fullname: string;
+	email: string;
+}
+
+export interface UpdatePasswordRequest {
+	email: string;
+	current_password: string;
+	new_password: string;
+}
+
+export interface UserListItemResponse {
+	user_id: number;
+	fullname: string;
+	email: string;
+	role: string;
+	is_active: boolean;
 }
 
 export interface JobApi {
@@ -220,8 +250,57 @@ export function loginUser(data: LoginRequest) {
 	});
 }
 
+export function getUserProfile(email: string) {
+	return jsonFetch<UserProfileResponse>(`${BASE_URL}${API_ENDPOINTS.AUTH.PROFILE}/${encodeURIComponent(email)}`, {
+		method: 'GET',
+		cache: 'no-store',
+	});
+}
+
+export function updateUserProfile(data: UpdateUserProfileRequest) {
+	return jsonFetch<UserProfileResponse>(`${BASE_URL}${API_ENDPOINTS.AUTH.PROFILE}`, {
+		method: 'PUT',
+		body: JSON.stringify(data),
+	});
+}
+
+export function updateUserPassword(data: UpdatePasswordRequest) {
+	return jsonFetch<{ message: string }>(`${BASE_URL}${API_ENDPOINTS.AUTH.PASSWORD}`, {
+		method: 'PUT',
+		body: JSON.stringify(data),
+	});
+}
+
+export function getAllUsers() {
+	return jsonFetch<UserListItemResponse[]>(`${BASE_URL}${API_ENDPOINTS.AUTH.USERS}`, {
+		method: 'GET',
+		cache: 'no-store',
+	});
+}
+
 export function getAllJobs(): Promise<JobApi[]> {
 	return jsonFetch(`${BASE_URL}${API_ENDPOINTS.CRUD.GET_JOBS}`, { method: 'GET', cache: 'no-store' });
+}
+
+export function getJobsPage(params: {
+	limit: number;
+	offset: number;
+	query?: string;
+	location?: string;
+	city?: 'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi' | '';
+	onlyRemote?: boolean;
+}): Promise<JobApi[]> {
+	const search = new URLSearchParams();
+	search.set('limit', String(params.limit));
+	search.set('offset', String(params.offset));
+	if (params.query?.trim()) search.set('query', params.query.trim());
+	if (params.location?.trim()) search.set('location', params.location.trim());
+	if (params.city) search.set('city', params.city);
+	if (params.onlyRemote) search.set('only_remote', 'true');
+	return jsonFetch(`${BASE_URL}${API_ENDPOINTS.CRUD.GET_JOBS}?${search.toString()}`, {
+		method: 'GET',
+		cache: 'no-store',
+	});
 }
 
 export function getJobsByCity(city: 'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi'): Promise<JobApi[]> {

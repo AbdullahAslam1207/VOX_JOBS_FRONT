@@ -1,57 +1,174 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import ErrorPopup from '../user/ErrorPopup';
+import { getStoredUser, getUserProfile, setStoredUser, updateUserPassword, updateUserProfile } from '../../api';
+
+const ADMIN_PREFS_KEY = 'voxjobs_admin_prefs';
+
+type AdminPreferences = {
+  emailNotifications: boolean;
+  autoApproveJobs: boolean;
+};
+
+const defaultPreferences: AdminPreferences = {
+  emailNotifications: true,
+  autoApproveJobs: false,
+};
 
 export default function AdminSettings() {
-  const [fullName, setFullName] = useState('Admin User');
-  const [email, setEmail] = useState('admin@voxjobs.com');
+  const storedUser = getStoredUser();
+  const [fullName, setFullName] = useState(storedUser?.fullname || '');
+  const [email, setEmail] = useState(storedUser?.email || '');
+  const [currentEmail, setCurrentEmail] = useState(storedUser?.email || '');
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [preferences, setPreferences] = useState<AdminPreferences>(defaultPreferences);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [popupError, setPopupError] = useState('');
 
-  const handleSaveProfile = () => {
-    // Validate required fields
-    if (!fullName || !email) {
-      alert('Please fill in all required fields');
+  useEffect(() => {
+    const rawPrefs = localStorage.getItem(ADMIN_PREFS_KEY);
+    if (rawPrefs) {
+      try {
+        const parsed = JSON.parse(rawPrefs) as AdminPreferences;
+        setPreferences({
+          emailNotifications: !!parsed.emailNotifications,
+          autoApproveJobs: !!parsed.autoApproveJobs,
+        });
+      } catch {
+        setPreferences(defaultPreferences);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!storedUser?.email) return;
+      setLoadingProfile(true);
+      try {
+        const profile = await getUserProfile(storedUser.email);
+        setFullName(profile.fullname || '');
+        setEmail(profile.email || storedUser.email || '');
+        setCurrentEmail(profile.email || storedUser.email || '');
+        setStoredUser({
+          ...storedUser,
+          user_id: profile.user_id,
+          fullname: profile.fullname,
+          email: profile.email,
+          role: profile.role,
+        });
+      } catch (err: any) {
+        setPopupError(err?.message || 'Unable to load admin profile.');
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  function persistPreferences(next: AdminPreferences) {
+    setPreferences(next);
+    localStorage.setItem(ADMIN_PREFS_KEY, JSON.stringify(next));
+  }
+
+  const handleSaveProfile = async () => {
+    if (!currentEmail) {
+      setPopupError('Please login first.');
+      return;
+    }
+    if (!fullName.trim() || !email.trim()) {
+      setPopupError('Please fill in all required fields.');
       return;
     }
 
-    console.log('Admin profile update:', { fullName, email });
-    setIsEditing(false);
-    alert('Profile updated successfully!');
+    setSavingProfile(true);
+    setProfileMsg('');
+    try {
+      const updated = await updateUserProfile({
+        current_email: currentEmail,
+        fullname: fullName.trim(),
+        email: email.trim().toLowerCase(),
+      });
+
+      const nextUser = {
+        ...(storedUser || {}),
+        user_id: updated.user_id,
+        fullname: updated.fullname,
+        email: updated.email,
+        role: updated.role,
+      };
+      setStoredUser(nextUser);
+      setFullName(updated.fullname);
+      setEmail(updated.email);
+      setCurrentEmail(updated.email);
+      setIsEditing(false);
+      setProfileMsg('Profile updated successfully.');
+    } catch (err: any) {
+      setPopupError(err?.message || 'Profile update failed.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const handleSavePassword = () => {
-    // Validate password fields
+  const handleSavePassword = async () => {
+    if (!currentEmail) {
+      setPopupError('Please login first.');
+      return;
+    }
+
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alert('Please fill in all password fields');
+      setPopupError('Please fill in all password fields.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
+      setPopupError('New passwords do not match.');
       return;
     }
 
-    if (newPassword.length < 6) {
-      alert('New password must be at least 6 characters long');
+    if (newPassword.length < 8) {
+      setPopupError('New password must be at least 8 characters long.');
       return;
     }
 
-    console.log('Admin password update:', { currentPassword, newPassword });
-    
-    // Clear password fields
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setIsEditingPassword(false);
-    alert('Password updated successfully!');
+    setSavingPassword(true);
+    setPasswordMsg('');
+    try {
+      await updateUserPassword({
+        email: currentEmail,
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsEditingPassword(false);
+      setPasswordMsg('Password updated successfully.');
+    } catch (err: any) {
+      setPopupError(err?.message || 'Password update failed.');
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   return (
     <div className="p-6 md:p-8 text-white/90">
+      <ErrorPopup message={popupError} onClose={() => setPopupError('')} />
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl md:text-3xl font-semibold mb-8">Admin Settings</h1>
+        {!currentEmail && (
+          <div className="mb-4 rounded-lg border border-yellow-400/30 bg-yellow-500/10 text-yellow-200 px-4 py-3 text-sm">
+            Login as an admin to manage settings.
+          </div>
+        )}
 
         <div className="space-y-6">
           {/* Profile Information */}
@@ -76,7 +193,7 @@ export default function AdminSettings() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  disabled={!isEditing}
+                  disabled={!isEditing || loadingProfile}
                   className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/5 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -89,7 +206,7 @@ export default function AdminSettings() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={!isEditing}
+                  disabled={!isEditing || loadingProfile}
                   className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/5 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -171,14 +288,16 @@ export default function AdminSettings() {
                   </button>
                   <button
                     onClick={handleSavePassword}
+                    disabled={savingPassword}
                     className="px-6 py-3 rounded-lg font-medium text-sm text-white transition-colors"
                     style={{ backgroundColor: '#6A1E55' }}
                   >
-                    Update Password
+                    {savingPassword ? 'Updating...' : 'Update Password'}
                   </button>
                 </div>
               </div>
             )}
+            {passwordMsg && <p className="mt-3 text-sm text-emerald-300">{passwordMsg}</p>}
           </div>
 
           {/* Admin Preferences */}
@@ -192,7 +311,17 @@ export default function AdminSettings() {
                   <p className="text-xs text-white/60">Receive notifications for new job applications</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" defaultChecked className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    checked={preferences.emailNotifications}
+                    onChange={(e) =>
+                      persistPreferences({
+                        ...preferences,
+                        emailNotifications: e.target.checked,
+                      })
+                    }
+                    className="sr-only peer"
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
                 </label>
               </div>
@@ -203,7 +332,17 @@ export default function AdminSettings() {
                   <p className="text-xs text-white/60">Automatically approve job postings from verified employers</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    checked={preferences.autoApproveJobs}
+                    onChange={(e) =>
+                      persistPreferences({
+                        ...preferences,
+                        autoApproveJobs: e.target.checked,
+                      })
+                    }
+                    className="sr-only peer"
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
                 </label>
               </div>
@@ -221,13 +360,15 @@ export default function AdminSettings() {
               </button>
               <button
                 onClick={handleSaveProfile}
+                disabled={savingProfile || loadingProfile}
                 className="px-6 py-3 rounded-lg font-medium text-sm text-white transition-colors"
                 style={{ backgroundColor: '#6A1E55' }}
               >
-                Save Changes
+                {savingProfile ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           )}
+          {profileMsg && <p className="text-sm text-emerald-300">{profileMsg}</p>}
         </div>
       </div>
     </div>

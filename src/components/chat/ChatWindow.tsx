@@ -20,6 +20,17 @@ import MessageBubble from './MessageBubble';
 import JobCard from './JobCard';
 
 const CONVERSATION_STORAGE_KEY = 'voxjobs_conversation_id';
+const VOICE_WS_PATH = '/ws/voice_chat';
+const VOICE_SILENCE_DURATION = 1800;
+const VOICE_AUDIO_THRESHOLD = 0.01;
+const VOICE_WS_CONNECT_TIMEOUT_MS = 8000;
+
+type VoiceSocketMessage = {
+	type?: string;
+	message?: string;
+	text?: string;
+	jobs?: ChatJobCard[];
+};
 
 function getStoredConversationId(): number | null {
 	if (typeof window === 'undefined') return null;
@@ -165,6 +176,7 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 	const user = useMemo(() => getStoredUser(), []);
+	const userEmail = useMemo(() => (user?.email || '').trim(), [user]);
 	const [conversationId, setConversationId] = useState<number | null>(() => getStoredConversationId());
 	const [items, setItems] = useState<ConversationStreamItem[]>([]);
 	const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -175,7 +187,62 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 	const [toast, setToast] = useState<ToastState | null>(null);
 	const [pendingItems, setPendingItems] = useState<ConversationStreamItem[]>([]);
 	const [localSequenceCounter, setLocalSequenceCounter] = useState(0);
+	const [isVoiceListening, setIsVoiceListening] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const wsRef = useRef<WebSocket | null>(null);
+	const streamRef = useRef<MediaStream | null>(null);
+	const audioContextRef = useRef<AudioContext | null>(null);
+	const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+	const processorRef = useRef<ScriptProcessorNode | null>(null);
+	const silenceTimerRef = useRef<number | null>(null);
+	const lastSoundTimeRef = useRef<number>(Date.now());
+	const hasSpokenRef = useRef(false);
+	const isVoiceListeningRef = useRef(false);
+	const loadingReplyRef = useRef(false);
+	const itemsRef = useRef<ConversationStreamItem[]>([]);
+	const localSeqRef = useRef(0);
+
+	useEffect(() => {
+		itemsRef.current = items;
+	}, [items]);
+
+	useEffect(() => {
+		localSeqRef.current = localSequenceCounter;
+	}, [localSequenceCounter]);
+
+	useEffect(() => {
+		loadingReplyRef.current = loadingReply;
+	}, [loadingReply]);
+
+	const voiceWsUrl = useMemo(() => {
+		const explicitSocketUrl = (import.meta.env.VITE_VOICE_CHAT_WS_URL as string | undefined)?.trim();
+		const chatBackendHttp = (import.meta.env.VITE_CHAT_BACKEND_URL as string | undefined)?.trim();
+		const backendHttp = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim() || 'http://localhost:8000';
+		const withUserEmail = (rawUrl: string) => {
+			if (!userEmail) return rawUrl;
+			const separator = rawUrl.includes('?') ? '&' : '?';
+			return `${rawUrl}${separator}User_Email=${encodeURIComponent(userEmail)}`;
+		};
+
+		if (explicitSocketUrl) return withUserEmail(explicitSocketUrl);
+		if (chatBackendHttp) {
+			try {
+				const parsed = new URL(chatBackendHttp.replace(/\/+$/, ''));
+				const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+				return withUserEmail(`${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`);
+			} catch {
+				// fall through
+			}
+		}
+		try {
+			const parsed = new URL(backendHttp.replace(/\/+$/, ''));
+			const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+			return withUserEmail(`${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`);
+		} catch {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			return withUserEmail(`${protocol}//${window.location.host}${VOICE_WS_PATH}`);
+		}
+	}, [userEmail]);
 
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -466,13 +533,276 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 		}
 	}
 
+	const clearSilenceTimer = useCallback(() => {
+		if (silenceTimerRef.current !== null) {
+			window.clearTimeout(silenceTimerRef.current);
+			silenceTimerRef.current = null;
+		}
+	}, []);
+
+	const float32ToPCM16 = useCallback((float32Array: Float32Array) => {
+		const buffer = new ArrayBuffer(float32Array.length * 2);
+		const view = new DataView(buffer);
+		for (let i = 0; i < float32Array.length; i += 1) {
+			const sample = Math.max(-1, Math.min(1, float32Array[i]));
+			view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+		}
+		return buffer;
+	}, []);
+
+	const detectSilence = useCallback((floatData: Float32Array) => {
+		let sum = 0;
+		for (let i = 0; i < floatData.length; i += 1) {
+			sum += floatData[i] * floatData[i];
+		}
+		const rms = Math.sqrt(sum / floatData.length);
+		return rms < VOICE_AUDIO_THRESHOLD;
+	}, []);
+
+	const appendUserMessage = useCallback((text: string) => {
+		const content = text.trim();
+		if (!content) return;
+		const userSequence = localSeqRef.current + 1;
+		const userMessage: ConversationMessageItem = {
+			type: 'message',
+			id: -Date.now() - Math.floor(Math.random() * 1000),
+			conversation_id: conversationId ?? -1,
+			sender: 'user',
+			text: content,
+			sequence_num: userSequence,
+			job_sequence_id: null,
+			created_at: new Date().toISOString(),
+		};
+		const working = upsertItem(itemsRef.current, userMessage);
+		setItems(working);
+		setPendingItems((prev) => [...prev, userMessage]);
+		setLocalSequenceCounter(userSequence);
+		setSelectedJobSequence(null);
+		setHighlightedJobSequence(null);
+		itemsRef.current = working;
+		localSeqRef.current = userSequence;
+	}, [conversationId]);
+
+	const appendBotReply = useCallback((text: string, cards: ChatJobCard[]) => {
+		const botText = text.trim() || 'Here are some matching jobs for you.';
+		let currentSequence = localSeqRef.current + 1;
+		const botMessage: ConversationMessageItem = {
+			type: 'message',
+			id: -Date.now() - 2000 - Math.floor(Math.random() * 1000),
+			conversation_id: conversationId ?? -1,
+			sender: 'llm',
+			text: botText,
+			sequence_num: currentSequence,
+			job_sequence_id: null,
+			created_at: new Date().toISOString(),
+		};
+
+		let working = upsertItem(itemsRef.current, botMessage);
+		const toPersist: ConversationStreamItem[] = [botMessage];
+		for (const card of cards || []) {
+			currentSequence += 1;
+			const jobItem: ConversationJobItem = {
+				type: 'job',
+				id: -Date.now() - Math.random(),
+				conversation_id: conversationId ?? -1,
+				job_json: card,
+				sequence_num: currentSequence,
+				created_at: new Date().toISOString(),
+			};
+			working = upsertItem(working, jobItem);
+			toPersist.push(jobItem);
+		}
+
+		setItems(working);
+		setPendingItems((prev) => [...prev, ...toPersist]);
+		setLocalSequenceCounter(currentSequence);
+		itemsRef.current = working;
+		localSeqRef.current = currentSequence;
+	}, [conversationId]);
+
+	const playAudio = useCallback((audioData: Blob | ArrayBuffer) => {
+		try {
+			const blob = audioData instanceof Blob ? audioData : new Blob([audioData], { type: 'audio/wav' });
+			const url = URL.createObjectURL(blob);
+			const audio = new Audio(url);
+			audio.play().catch(() => undefined);
+			audio.onended = () => URL.revokeObjectURL(url);
+		} catch {
+			// ignore
+		}
+	}, []);
+
+	const ensureVoiceSocket = useCallback(async () => {
+		const existing = wsRef.current;
+		if (existing && existing.readyState === WebSocket.OPEN) return existing;
+
+		return await new Promise<WebSocket>((resolve, reject) => {
+			const ws = new WebSocket(voiceWsUrl);
+			wsRef.current = ws;
+			let settled = false;
+			const timeout = window.setTimeout(() => {
+				if (settled) return;
+				settled = true;
+				try {
+					ws.close();
+				} catch {
+					// ignore
+				}
+				reject(new Error('Voice server timeout. Please try again.'));
+			}, VOICE_WS_CONNECT_TIMEOUT_MS);
+
+			ws.onopen = () => {
+				if (settled) return;
+				settled = true;
+				window.clearTimeout(timeout);
+				resolve(ws);
+			};
+
+			ws.onmessage = (event) => {
+				if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+					playAudio(event.data);
+					return;
+				}
+				if (typeof event.data !== 'string') return;
+
+				let data: VoiceSocketMessage;
+				try {
+					data = JSON.parse(event.data) as VoiceSocketMessage;
+				} catch {
+					return;
+				}
+
+				if (data.type === 'transcription' && data.text) {
+					appendUserMessage(data.text);
+				}
+				if (data.type === 'response') {
+					appendBotReply(data.message || '', data.jobs || []);
+					setLoadingReply(false);
+				}
+				if (data.type === 'error') {
+					setLoadingReply(false);
+					setToast({ message: data.message || 'Voice request failed.', type: 'error' });
+				}
+			};
+
+			ws.onerror = () => {
+				if (settled) return;
+				settled = true;
+				window.clearTimeout(timeout);
+				setLoadingReply(false);
+				reject(new Error('Voice websocket connection failed.'));
+			};
+
+			ws.onclose = () => {
+				wsRef.current = null;
+				setIsVoiceListening(false);
+				isVoiceListeningRef.current = false;
+				if (!settled) {
+					settled = true;
+					window.clearTimeout(timeout);
+					reject(new Error('Voice websocket closed before connecting.'));
+				}
+			};
+		});
+	}, [appendBotReply, appendUserMessage, playAudio, voiceWsUrl]);
+
+	const stopVoiceCapture = useCallback(async (sendEnd: boolean) => {
+		isVoiceListeningRef.current = false;
+		setIsVoiceListening(false);
+		clearSilenceTimer();
+
+		if (processorRef.current) {
+			processorRef.current.disconnect();
+			processorRef.current.onaudioprocess = null;
+			processorRef.current = null;
+		}
+		if (sourceRef.current) {
+			sourceRef.current.disconnect();
+			sourceRef.current = null;
+		}
+		if (audioContextRef.current) {
+			await audioContextRef.current.close();
+			audioContextRef.current = null;
+		}
+		if (streamRef.current) {
+			streamRef.current.getTracks().forEach((track) => track.stop());
+			streamRef.current = null;
+		}
+
+		if (sendEnd && hasSpokenRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+			wsRef.current.send(JSON.stringify({ action: 'end' }));
+			setLoadingReply(true);
+			hasSpokenRef.current = false;
+		}
+	}, [clearSilenceTimer]);
+
+	const startVoiceCapture = useCallback(async () => {
+		if (loadingReplyRef.current || isVoiceListeningRef.current) return;
+
+		try {
+			await ensureVoiceSocket();
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+			if (!AudioContextClass) throw new Error('AudioContext is not supported.');
+
+			const audioContext = new AudioContextClass({ sampleRate: 16000 });
+			const source = audioContext.createMediaStreamSource(stream);
+			const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+			processor.onaudioprocess = (event) => {
+				if (!isVoiceListeningRef.current) return;
+				const floatData = event.inputBuffer.getChannelData(0);
+				const silent = detectSilence(floatData);
+
+				if (!silent) {
+					lastSoundTimeRef.current = Date.now();
+					hasSpokenRef.current = true;
+					clearSilenceTimer();
+				} else if (hasSpokenRef.current && silenceTimerRef.current === null) {
+					silenceTimerRef.current = window.setTimeout(() => {
+						if (Date.now() - lastSoundTimeRef.current >= VOICE_SILENCE_DURATION) {
+							stopVoiceCapture(true).catch(() => undefined);
+						}
+					}, VOICE_SILENCE_DURATION);
+				}
+
+				const pcm16 = float32ToPCM16(floatData);
+				if (wsRef.current?.readyState === WebSocket.OPEN) {
+					wsRef.current.send(pcm16);
+				}
+			};
+
+			source.connect(processor);
+			processor.connect(audioContext.destination);
+
+			streamRef.current = stream;
+			audioContextRef.current = audioContext;
+			sourceRef.current = source;
+			processorRef.current = processor;
+
+			hasSpokenRef.current = false;
+			lastSoundTimeRef.current = Date.now();
+			isVoiceListeningRef.current = true;
+			setIsVoiceListening(true);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Microphone access failed.';
+			setToast({ message, type: 'error' });
+			await stopVoiceCapture(false);
+		}
+	}, [clearSilenceTimer, detectSilence, ensureVoiceSocket, float32ToPCM16, stopVoiceCapture]);
+
 	async function handleClose() {
+		await stopVoiceCapture(false);
+		if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+			wsRef.current.close();
+		}
 		// Save pending items before closing
 		await savePendingItems();
 		onClose();
 	}
 
 	async function startNewConversation() {
+		await stopVoiceCapture(false);
 		// Save pending items before starting new conversation
 		await savePendingItems();
 		setConversationId(null);
@@ -485,6 +815,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 	}
 
 	async function selectConversation(id: number) {
+		await stopVoiceCapture(false);
 		// Save pending items before switching conversations
 		await savePendingItems();
 		setConversationId(id);
@@ -640,6 +971,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 						disabled={loadingReply}
 					/>
 					<button
+						type="button"
+						onClick={() => {
+							startVoiceCapture().catch(() => undefined);
+						}}
+						disabled={loadingReply || isVoiceListening}
+						className="px-4 py-3 rounded-lg bg-white/10 border border-white/15 text-white font-semibold hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					>
+						{isVoiceListening ? 'Listening...' : 'Start Voice'}
+					</button>
+					<button
 						onClick={handleSend}
 						disabled={loadingReply || !input.trim()}
 						className="px-6 py-3 rounded-lg bg-[#6A1E55] text-white font-semibold hover:bg-[#7A2E65] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -653,4 +994,3 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 };
 
 export default ChatWindow;
-

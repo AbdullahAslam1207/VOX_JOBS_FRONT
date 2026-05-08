@@ -403,10 +403,7 @@ export default function MockInterview() {
     <div className="p-6 md:p-8 text-white/90">
       <div className="rounded-2xl border border-white/10 overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(19,16,34,0.82), rgba(29,22,41,0.75))' }}>
         <div className="px-5 py-4 border-b border-white/10 bg-black/10 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">AI Mock Interview</h1>
-            <p className="text-xs md:text-sm text-white/65 mt-1">Practice one focused interview round with voice responses.</p>
-          </div>
+          <h1 className="text-xl md:text-2xl font-semibold">Mock Interview Voice Test</h1>
           <span
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
               socketState === 'connected'
@@ -427,7 +424,7 @@ export default function MockInterview() {
           />
           <button
             onClick={startInterview}
-            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] shadow-lg shadow-[#6A1E55]/25 transition-all duration-200"
+            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-[#6A1E55] hover:bg-[#7A2E65] transition-colors"
           >
             Start Interview
           </button>
@@ -474,6 +471,8 @@ export default function MockInterview() {
           )}
         </div>
 
+        <div className="px-5 py-3 border-y border-white/10 bg-cyan-400/10 text-cyan-100 text-sm">{statusText}</div>
+
         <div className="flex flex-wrap gap-3 p-4 md:p-5">
           <button
             onClick={() => {
@@ -483,18 +482,15 @@ export default function MockInterview() {
               }
               stopRecording().catch(() => undefined);
             }}
-            title={statusText}
-            className={`px-4 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200 ${
-              isRecording
-                ? 'bg-gradient-to-r from-[#A0294F] to-[#C73862] hover:from-[#B2345C] hover:to-[#D9456F] shadow-md shadow-[#A0294F]/30'
-                : 'bg-gradient-to-r from-[#6A1E55] to-[#8E3A73] hover:from-[#7A2E65] hover:to-[#9E4A83] shadow-md shadow-[#6A1E55]/30'
+            className={`px-4 py-2.5 rounded-lg font-semibold text-sm text-white transition-colors ${
+              isRecording ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'
             }`}
           >
             {isRecording ? 'Stop Speaking' : 'Start Speaking'}
           </button>
           <button
             onClick={finishInterview}
-            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-[#4F2E8A] to-[#6A3DA8] hover:from-[#5E37A1] hover:to-[#7949BE] shadow-md shadow-[#4F2E8A]/30 transition-all duration-200"
+            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
           >
             Finish Interview
           </button>
@@ -502,7 +498,7 @@ export default function MockInterview() {
             onClick={() => {
               clearSession().catch(() => undefined);
             }}
-            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-white/10 border border-white/20 hover:bg-white/15 transition-all duration-200"
+            className="px-4 py-2.5 rounded-lg font-semibold text-sm text-white bg-slate-600 hover:bg-slate-500 transition-colors"
           >
             Clear Session
           </button>

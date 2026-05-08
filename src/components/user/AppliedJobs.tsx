@@ -62,34 +62,32 @@ export default function AppliedJobs() {
         <div className="grid md:grid-cols-2 gap-4">
           {jobs.map((job) => (
             <div key={job.id} className="rounded-xl p-5 border border-white/10 bg-white/5">
+              {(() => {
+                const normalizedStatus = job.status === 'success' ? 'Success' : 'Failed';
+                const statusClasses =
+                  normalizedStatus === 'Success'
+                    ? 'bg-emerald-600/30 text-emerald-200'
+                    : 'bg-red-600/30 text-red-200';
+
+                return (
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold text-white">{job.job_title || 'Job Application'}</div>
                   <div className="text-white/70 text-sm">{job.company_name || 'Unknown Company'} • {job.site}</div>
                 </div>
                 <span
-                  className={`px-2 py-1 rounded-md text-xs font-semibold ${
-                    job.status === 'success'
-                      ? 'bg-emerald-600/30 text-emerald-200'
-                      : job.status === 'failed' || job.status === 'timeout'
-                      ? 'bg-red-600/30 text-red-200'
-                      : 'bg-yellow-600/30 text-yellow-200'
-                  }`}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold ${statusClasses}`}
                 >
-                  {job.status}
+                  {normalizedStatus}
                 </span>
               </div>
+                );
+              })()}
 
               <div className="mt-3 text-xs text-white/60">
                 Created: {new Date(job.created_at).toLocaleString()}
                 {job.applied_at ? ` • Applied: ${new Date(job.applied_at).toLocaleString()}` : ''}
               </div>
-
-              {job.error_message && (
-                <div className="mt-3 text-xs text-red-200 bg-red-900/20 border border-red-400/30 rounded-md p-2">
-                  {job.error_message}
-                </div>
-              )}
             </div>
           ))}
         </div>

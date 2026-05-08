@@ -5,9 +5,7 @@ import {
   deleteFavoriteJob,
   FavoriteJobCreate,
   getApplyRunStatus,
-  getAllJobs,
-  getJobsByCity,
-  getJobsByTitle,
+  getJobsPage,
   getStoredUser,
   JobApi,
   startApplyRun,
@@ -40,11 +38,14 @@ type SavedEntry = {
 };
 
 export default function UserJobs() {
+  const PAGE_SIZE = 20;
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
   const [city, setCity] = useState<'Lahore' | 'Karachi' | 'Islamabad' | 'Rawalpindi' | ''>('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [onlyRemote, setOnlyRemote] = useState(false);
   const [listening, setListening] = useState(false);
   const [saved, setSaved] = useState<Record<string, SavedEntry>>({});
@@ -74,21 +75,19 @@ export default function UserJobs() {
     }
   }, []);
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((j) => {
-      const matchesQuery = (j.title + ' ' + j.company + ' ' + j.description).toLowerCase().includes(query.toLowerCase());
-      const matchesLocation = location ? j.location.toLowerCase().includes(location.toLowerCase()) : true;
-      const matchesCity = city ? j.location?.toLowerCase().includes(city.toLowerCase()) : true;
-      const matchesRemote = onlyRemote ? j.location.toLowerCase().includes('remote') : true;
-      return matchesQuery && matchesLocation && matchesRemote && matchesCity;
-    });
-  }, [query, location, onlyRemote, city, jobs]);
-
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const data = await getAllJobs();
+        const data = await getJobsPage({
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+          query,
+          location,
+          city,
+          onlyRemote,
+        });
+
         const norm: Job[] = (data || []).map((d: JobApi) => {
           const id = String(d.id ?? Math.random());
           return {
@@ -111,92 +110,20 @@ export default function UserJobs() {
             job_link: d.job_link ?? id,
           };
         });
+
         setJobs(norm);
+        setHasNextPage(norm.length === PAGE_SIZE);
       } catch (e) {
-        // ignore
+        setJobs([]);
+        setHasNextPage(false);
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        if (!query.trim()) return;
-        const res = await getJobsByTitle(query.trim());
-        const norm: Job[] = (res || []).map((d: JobApi) => {
-          const id = String(d.id ?? Math.random());
-          return {
-            id,
-            title: d.title || 'Untitled',
-            company: d.company || 'Unknown',
-            location: d.location || '',
-            description: d.description || '',
-            email: d.email,
-            city: d.city,
-            salary: d.salary,
-            job_type: d.job_type,
-            job_shift: d.job_shift,
-            experience: d.experience,
-            education: d.education,
-            posted_date: d.posted_date,
-            apply_before: d.apply_before,
-            skills: d.skills,
-            job_source: d.job_source,
-            job_link: d.job_link ?? id,
-          };
-        });
-        setJobs(norm);
-      } catch {
-        // ignore
-      }
-    }, 400);
-    return () => {
-      controller.abort();
-      clearTimeout(t);
-    };
-  }, [query]);
-
-  useEffect(() => {
-    const loadCity = async () => {
-      try {
-        if (!city) return;
-        setLoading(true);
-        const res = await getJobsByCity(city as any);
-        const norm: Job[] = (res || []).map((d: JobApi) => {
-          const id = String(d.id ?? Math.random());
-          return {
-            id,
-            title: d.title || 'Untitled',
-            company: d.company || 'Unknown',
-            location: d.location || '',
-            description: d.description || '',
-            email: d.email,
-            city: d.city,
-            salary: d.salary,
-            job_type: d.job_type,
-            job_shift: d.job_shift,
-            experience: d.experience,
-            education: d.education,
-            posted_date: d.posted_date,
-            apply_before: d.apply_before,
-            skills: d.skills,
-            job_source: d.job_source,
-            job_link: d.job_link ?? id,
-          };
-        });
-        setJobs(norm);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadCity();
-  }, [city]);
+    const t = setTimeout(load, 350);
+    return () => clearTimeout(t);
+  }, [query, location, city, onlyRemote, page]);
 
   function toggleVoice() {
     if (!recognitionRef.current) return;
@@ -226,15 +153,6 @@ export default function UserJobs() {
     } else {
       speak(`${job.title} at ${job.company}. ${job.description}`);
     }
-  }
-
-  function applyEmail(job: Job) {
-    const subject = encodeURIComponent(`Application: ${job.title} - ${job.company}`);
-    const body = encodeURIComponent(
-      `Hello ${job.company} Team,\n\nI am excited to apply for the ${job.title} role. My experience aligns well with your requirements. I'd love to discuss how I can contribute.\n\nBest regards,\nYour Name\n`
-    );
-    const to = job.email || 'hr@example.com';
-    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
   }
 
   function isValidUrl(value: string) {
@@ -362,15 +280,15 @@ export default function UserJobs() {
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-md px-3 py-2">
             <span className="text-white/60">🔎</span>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Keywords: frontend, react, node" className="w-full bg-transparent text-white placeholder-white/40 outline-none" />
+            <input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} placeholder="Keywords: frontend, react, node" className="w-full bg-transparent text-white placeholder-white/40 outline-none" />
           </div>
           <div className="w-full md:w-[240px] flex items-center gap-2 bg-white/5 border border-white/10 rounded-md px-3 py-2">
             <span className="text-white/60">📍</span>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location or Remote" className="w-full bg-transparent text-white placeholder-white/40 outline-none" />
+            <input value={location} onChange={(e) => { setPage(1); setLocation(e.target.value); }} placeholder="Location or Remote" className="w-full bg-transparent text-white placeholder-white/40 outline-none" />
           </div>
           <div className="w-full md:w-[220px] flex items-center gap-2 bg-white/5 border border-white/10 rounded-md px-3 py-2">
             <span className="text-white/60">🏙️</span>
-            <select value={city} onChange={(e) => setCity(e.target.value as any)} className="w-full bg-transparent text-white outline-none">
+            <select value={city} onChange={(e) => { setPage(1); setCity(e.target.value as any); }} className="w-full bg-transparent text-white outline-none">
               <option value="" className="bg-purple-900 text-white">All Cities</option>
               <option value="Lahore" className="bg-purple-900 text-white">Lahore</option>
               <option value="Karachi" className="bg-purple-900 text-white">Karachi</option>
@@ -379,7 +297,7 @@ export default function UserJobs() {
             </select>
           </div>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={onlyRemote} onChange={(e) => setOnlyRemote(e.target.checked)} /> Remote</label>
+            <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={onlyRemote} onChange={(e) => { setPage(1); setOnlyRemote(e.target.checked); }} /> Remote</label>
             <button onClick={toggleVoice} className={`px-3 py-2 rounded-md text-sm font-semibold ${listening ? 'bg-emerald-600' : 'bg-[#6A1E55]'} text-white`}>{listening ? '🎤 Listening' : '🎤 Voice'}</button>
           </div>
         </div>
@@ -387,7 +305,7 @@ export default function UserJobs() {
 
       {loading && <div className="text-white/70 mb-3">Loading jobs…</div>}
       <div className="grid md:grid-cols-2 gap-4">
-        {filteredJobs.map((job) => (
+        {jobs.map((job) => (
           <div key={job.id} className="rounded-xl p-5 border border-white/10 bg-white/5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -405,7 +323,6 @@ export default function UserJobs() {
               >
                 {applying[job.job_link || job.id] ? 'Applying...' : 'Apply Directly'}
               </button>
-              <button onClick={() => applyEmail(job)} className="px-4 py-2 rounded-md text-sm font-semibold bg-white/10 hover:bg-white/15">Email with Cover Letter</button>
               <button
                 onClick={() => toggleSave(job)}
                 disabled={saveLoading === (job.job_link || job.id)}
@@ -421,6 +338,24 @@ export default function UserJobs() {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 mt-6">
+        <button
+          onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          disabled={page === 1 || loading}
+          className="px-4 py-2 rounded-md text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <div className="text-sm text-white/70">Page {page}</div>
+        <button
+          onClick={() => setPage((prev) => prev + 1)}
+          disabled={!hasNextPage || loading}
+          className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white disabled:opacity-50"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

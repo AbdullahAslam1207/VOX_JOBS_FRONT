@@ -6,6 +6,8 @@ import Registration from './components/registeration/reg';
 import AdminLayout from './components/admin/Layout';
 import AdminDashboard from './components/admin/Dashboard';
 import AdminSettings from './components/admin/Settings';
+import AdminListings from './components/admin/Listings';
+import AdminUsers from './components/admin/Users';
 import UnderDevelopment from './components/admin/UnderDevelopment';
 import UserLayout from './components/user/Layout';
 import UserDashboard from './components/user/Dashboard';
@@ -23,10 +25,9 @@ function App() {
         <Route path="/auth" element={<Registration />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="listings" element={<UnderDevelopment />} />
+          <Route path="listings" element={<AdminListings />} />
           <Route path="scrapers" element={<UnderDevelopment />} />
-          <Route path="users" element={<UnderDevelopment />} />
-          <Route path="analytics" element={<UnderDevelopment />} />
+          <Route path="users" element={<AdminUsers />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
         <Route path="/user" element={<UserLayout />}>

@@ -17,7 +17,6 @@ export default function AdminLayout() {
           <NavItem to="scrapers" label="Job Scrapers" />
           <NavItem to="listings" label="Job Listings" />
           <NavItem to="users" label="Users" />
-          <NavItem to="analytics" label="Analytics" />
           <NavItem to="settings" label="Settings" />
         </nav>
         <button onClick={() => (window.location.href = '/')} className="mt-auto w-full text-left px-4 py-6 text-sm text-white/80 hover:text-white/100">Logout</button>

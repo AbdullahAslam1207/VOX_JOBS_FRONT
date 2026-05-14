@@ -218,7 +218,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 		const explicitSocketUrl = (import.meta.env.VITE_VOICE_CHAT_WS_URL as string | undefined)?.trim();
 		const chatBackendHttp = (import.meta.env.VITE_CHAT_BACKEND_URL as string | undefined)?.trim();
 		const backendHttp = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim() || 'http://localhost:8000';
-<<<<<<< HEAD
 		const withUserEmail = (rawUrl: string) => {
 			if (!userEmail) return rawUrl;
 			const separator = rawUrl.includes('?') ? '&' : '?';
@@ -226,18 +225,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 		};
 
 		if (explicitSocketUrl) return withUserEmail(explicitSocketUrl);
-=======
-		if (explicitSocketUrl) return explicitSocketUrl;
->>>>>>> 7c1280ab5b80f6872b843e7f7fbcac1416f544a6
 		if (chatBackendHttp) {
 			try {
 				const parsed = new URL(chatBackendHttp.replace(/\/+$/, ''));
 				const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
-<<<<<<< HEAD
 				return withUserEmail(`${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`);
-=======
-				return `${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`;
->>>>>>> 7c1280ab5b80f6872b843e7f7fbcac1416f544a6
 			} catch {
 				// fall through
 			}
@@ -245,21 +237,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ onClose }) => {
 		try {
 			const parsed = new URL(backendHttp.replace(/\/+$/, ''));
 			const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
-<<<<<<< HEAD
 			return withUserEmail(`${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`);
 		} catch {
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 			return withUserEmail(`${protocol}//${window.location.host}${VOICE_WS_PATH}`);
 		}
 	}, [userEmail]);
-=======
-			return `${wsProtocol}//${parsed.host}${VOICE_WS_PATH}`;
-		} catch {
-			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-			return `${protocol}//${window.location.host}${VOICE_WS_PATH}`;
-		}
-	}, []);
->>>>>>> 7c1280ab5b80f6872b843e7f7fbcac1416f544a6
 
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

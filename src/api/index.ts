@@ -11,6 +11,7 @@ const VECTOR_STORE_BASE_URL = normalizeBaseUrl(
 	CHAT_BASE_URL
 );
 const USER_STORAGE_KEY = 'voxjobs_user';
+const RECRUITER_TOKEN_STORAGE_KEY = 'voxjobs_recruiter_token';
 
 // Centralized API endpoints - change these to update all API calls
 export const API_ENDPOINTS = {
@@ -20,6 +21,17 @@ export const API_ENDPOINTS = {
 		PROFILE: '/auth/profile',
 		PASSWORD: '/auth/password',
 		USERS: '/auth/users',
+	},
+	RECRUITER: {
+		SIGNUP: '/api/recruiter/signup',
+		LOGIN: '/api/recruiter/login',
+		JOB_SCHEMA: '/api/recruiter/job-schema',
+		JOBS: '/api/recruiter/jobs',
+	},
+	JOBS: {
+		CREATE: '/api/jobs/create',
+		CLOSE: '/api/jobs',
+		APPLICANTS: '/api/jobs',
 	},
 	CRUD: {
 		GET_JOBS: '/CRUD/Get_jobs',
@@ -55,9 +67,55 @@ export const API_ENDPOINTS = {
 		PROFILE_PICTURE_METADATA: '/apply/profile-picture',
 		MUSTAQBIL_CREDENTIALS: '/apply/mustaqbil-credentials',
 	},
+	RECOMMENDATIONS: {
+		CV_RECOMMENDATIONS: '/cv_recommendations',
+	},
 } as const;
 
-export type UserRoleBackend = 'Admin' | 'Job_Seeker';
+export type UserRoleBackend = 'Admin' | 'Job_Seeker' | 'Recruiter';
+
+export interface RecruiterRegisterRequest {
+	name: string;
+	email: string;
+	password: string;
+	companyName: string;
+	companyWebsite?: string;
+}
+
+export interface RecruiterLoginRequest {
+	email: string;
+	password: string;
+}
+
+export interface RecruiterAuthResponse {
+	access_token: string;
+	token_type: string;
+	id: number;
+	role: string;
+	name: string;
+	email: string;
+	company_name?: string | null;
+	company_website?: string | null;
+}
+
+export interface RecruiterJobSchemaField {
+	name: string;
+	label: string;
+	field_type: 'text' | 'textarea' | 'checkbox' | 'number';
+	required: boolean;
+	max_length?: number | null;
+	default?: string | null;
+}
+
+export interface RecruiterApplicant {
+	name: string;
+	email: string;
+	resume_file_name?: string | null;
+	resume_download_url?: string | null;
+	applied_at?: string | null;
+	status?: string | null;
+	site?: string | null;
+}
 
 export interface RegisterRequest {
 	fullname: string;
@@ -105,6 +163,7 @@ export interface JobApi {
 	company?: string;
 	location?: string;
 	description?: string;
+	job_description?: string;
 	email?: string;
 	// Optional fields we may forward when saving favorites
 	city?: string;
@@ -119,6 +178,9 @@ export interface JobApi {
 	skills?: string;
 	job_source?: string;
 	job_link?: string;
+	application_status?: string;
+	recruiter_id?: number;
+	applicants_count?: number;
 }
 
 // User session helpers
@@ -127,6 +189,8 @@ export interface StoredUser {
 	email?: string;
 	fullname?: string;
 	role?: string;
+	company_name?: string;
+	company_website?: string;
 }
 
 const PROFILE_STORAGE_KEY = 'voxjobs_profile';
@@ -161,9 +225,43 @@ export function clearStoredUser() {
 	if (typeof window === 'undefined') return;
 	try {
 		localStorage.removeItem(USER_STORAGE_KEY);
+		localStorage.removeItem(RECRUITER_TOKEN_STORAGE_KEY);
 	} catch {
 		// ignore
 	}
+}
+
+export function setRecruiterToken(token: string) {
+	if (typeof window === 'undefined') return;
+	try {
+		localStorage.setItem(RECRUITER_TOKEN_STORAGE_KEY, token);
+	} catch {
+		// ignore write errors
+	}
+}
+
+export function getRecruiterToken(): string | null {
+	if (typeof window === 'undefined') return null;
+	try {
+		return localStorage.getItem(RECRUITER_TOKEN_STORAGE_KEY);
+	} catch {
+		return null;
+	}
+}
+
+export function clearRecruiterToken() {
+	if (typeof window === 'undefined') return;
+	try {
+		localStorage.removeItem(RECRUITER_TOKEN_STORAGE_KEY);
+	} catch {
+		// ignore
+	}
+}
+
+function getRecruiterAuthHeaders(): Record<string, string> {
+	const token = getRecruiterToken();
+	if (!token) return {};
+	return { Authorization: `Bearer ${token}` };
 }
 
 export function getStoredProfile(): StoredProfile | null {
@@ -194,6 +292,8 @@ export function persistUserFromAuthResponse(res: any, fallbackEmail?: string): S
 		email: candidate?.email ?? res?.email ?? fallbackEmail,
 		fullname: candidate?.fullname ?? candidate?.full_name ?? candidate?.name,
 		role: candidate?.role ?? res?.role,
+		company_name: candidate?.company_name ?? candidate?.companyName,
+		company_website: candidate?.company_website ?? candidate?.companyWebsite,
 	};
 
 	if (stored.user_id || stored.email || stored.fullname) {
@@ -248,6 +348,28 @@ export function loginUser(data: LoginRequest) {
 		method: 'POST',
 		body: JSON.stringify(data),
 	});
+}
+
+export async function registerRecruiter(data: RecruiterRegisterRequest) {
+	const response = await jsonFetch<RecruiterAuthResponse>(`${BASE_URL}${API_ENDPOINTS.RECRUITER.SIGNUP}`, {
+		method: 'POST',
+		body: JSON.stringify(data),
+	});
+	if (response?.access_token) {
+		setRecruiterToken(response.access_token);
+	}
+	return response;
+}
+
+export async function loginRecruiter(data: RecruiterLoginRequest) {
+	const response = await jsonFetch<RecruiterAuthResponse>(`${BASE_URL}${API_ENDPOINTS.RECRUITER.LOGIN}`, {
+		method: 'POST',
+		body: JSON.stringify(data),
+	});
+	if (response?.access_token) {
+		setRecruiterToken(response.access_token);
+	}
+	return response;
 }
 
 export function getUserProfile(email: string) {
@@ -331,8 +453,69 @@ export async function createVectorStore(): Promise<number> {
 
 // Removed total users endpoint per requirements
 
-export function mapUiRoleToBackend(uiRole: 'admin' | 'jobseeker'): UserRoleBackend {
-	return uiRole === 'admin' ? 'Admin' : 'Job_Seeker';
+export function mapUiRoleToBackend(uiRole: 'admin' | 'jobseeker' | 'recruiter'): UserRoleBackend {
+	if (uiRole === 'admin') return 'Admin';
+	if (uiRole === 'recruiter') return 'Recruiter';
+	return 'Job_Seeker';
+}
+
+export function getRecruiterJobSchema() {
+	return jsonFetch<RecruiterJobSchemaField[]>(`${BASE_URL}${API_ENDPOINTS.RECRUITER.JOB_SCHEMA}`, {
+		method: 'GET',
+		headers: getRecruiterAuthHeaders(),
+		cache: 'no-store',
+	});
+}
+
+export function getRecruiterJobs() {
+	return jsonFetch<{ jobs: JobApi[]; open_jobs: JobApi[]; closed_jobs: JobApi[] }>(
+		`${BASE_URL}${API_ENDPOINTS.RECRUITER.JOBS}`,
+		{
+			method: 'GET',
+			headers: getRecruiterAuthHeaders(),
+			cache: 'no-store',
+		}
+	);
+}
+
+export function createRecruiterJob(payload: Record<string, any>) {
+	return jsonFetch<JobApi>(`${BASE_URL}${API_ENDPOINTS.JOBS.CREATE}`, {
+		method: 'POST',
+		headers: getRecruiterAuthHeaders(),
+		body: JSON.stringify(payload),
+	});
+}
+
+export function updateRecruiterJob(jobId: number, payload: Record<string, any>) {
+	return jsonFetch<JobApi>(`${BASE_URL}${API_ENDPOINTS.JOBS.CREATE.replace('/create', '')}/${jobId}`, {
+		method: 'PATCH',
+		headers: getRecruiterAuthHeaders(),
+		body: JSON.stringify(payload),
+	});
+}
+
+export function closeRecruiterJob(jobId: number) {
+	return jsonFetch<JobApi>(`${BASE_URL}${API_ENDPOINTS.JOBS.CLOSE}/${jobId}/close`, {
+		method: 'PATCH',
+		headers: getRecruiterAuthHeaders(),
+		cache: 'no-store',
+	});
+}
+
+export function deleteRecruiterJob(jobId: number) {
+	return jsonFetch<{ message: string }>(`${BASE_URL}${API_ENDPOINTS.JOBS.CREATE.replace('/create', '')}/${jobId}`, {
+		method: 'DELETE',
+		headers: getRecruiterAuthHeaders(),
+		cache: 'no-store',
+	});
+}
+
+export function getRecruiterApplicants(jobId: number) {
+	return jsonFetch<RecruiterApplicant[]>(`${BASE_URL}${API_ENDPOINTS.JOBS.APPLICANTS}/${jobId}/applicants`, {
+		method: 'GET',
+		headers: getRecruiterAuthHeaders(),
+		cache: 'no-store',
+	});
 }
 
 // Favorites types and APIs
@@ -526,6 +709,7 @@ export interface ApplyRunRequest {
 	url: string;
 	job_title?: string;
 	company_name?: string;
+	job_id?: number;
 }
 
 export interface ApplyRunCreateResponse {
@@ -534,9 +718,21 @@ export interface ApplyRunCreateResponse {
 	site: string;
 }
 
+export interface PlatformApplyRequest {
+	email: string;
+	job_id: number;
+}
+
+export interface PlatformApplyResponse {
+	application_id: number;
+	status: string;
+	message: string;
+}
+
 export interface ApplyRunStatusResponse {
 	id: number;
 	email: string;
+	job_id?: number | null;
 	url: string;
 	site: string;
 	status: string;
@@ -550,6 +746,7 @@ export interface ApplyRunStatusResponse {
 export interface AppliedJobResponse {
 	id: number;
 	user_id: number;
+	job_id?: number | null;
 	email: string;
 	site: string;
 	job_url: string;
@@ -615,8 +812,40 @@ export interface MustaqbilCredentialResponse {
 	updated_at: string;
 }
 
+export interface CVRecommendationJob {
+	title: string;
+	company_name: string;
+	location: string;
+	salary: string | null;
+	job_type: string;
+	experience: string;
+	education: string;
+	posted_date: string;
+	apply_before: string;
+	job_description: string | null;
+	skills: string;
+	job_link: string;
+}
+
+export interface CVRecommendationResponse {
+	response: {
+		message: string;
+		jobs: CVRecommendationJob[];
+	};
+	status: number;
+	cv_path: string;
+	generated_query: string;
+}
+
 export function startApplyRun(payload: ApplyRunRequest) {
 	return jsonFetch<ApplyRunCreateResponse>(`${BASE_URL}${API_ENDPOINTS.APPLY.RUN}`, {
+		method: 'POST',
+		body: JSON.stringify(payload),
+	});
+}
+
+export function applyPlatformJob(payload: PlatformApplyRequest) {
+	return jsonFetch<PlatformApplyResponse>(`${BASE_URL}/apply/platform`, {
 		method: 'POST',
 		body: JSON.stringify(payload),
 	});
@@ -712,6 +941,16 @@ export function getMustaqbilCredentials(email: string) {
 		`${BASE_URL}${API_ENDPOINTS.APPLY.MUSTAQBIL_CREDENTIALS}/${encodeURIComponent(email)}`,
 		{
 			method: 'GET',
+			cache: 'no-store',
+		}
+	);
+}
+
+export function getCVRecommendations() {
+	return jsonFetch<CVRecommendationResponse>(
+		`${CHAT_BASE_URL}${API_ENDPOINTS.RECOMMENDATIONS.CV_RECOMMENDATIONS}`,
+		{
+			method: 'POST',
 			cache: 'no-store',
 		}
 	);

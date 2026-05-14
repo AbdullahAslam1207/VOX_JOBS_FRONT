@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ErrorPopup from './ErrorPopup';
 import {
   addFavoriteJob,
+  applyPlatformJob,
   deleteFavoriteJob,
   FavoriteJobCreate,
   getApplyRunStatus,
@@ -30,6 +31,7 @@ type Job = {
   skills?: string;
   job_source?: string;
   job_link?: string;
+  isPlatformJob?: boolean;
 };
 
 type SavedEntry = {
@@ -95,7 +97,7 @@ export default function UserJobs() {
             title: d.title || 'Untitled',
             company: d.company || 'Unknown',
             location: d.location || '',
-            description: d.description || '',
+            description: d.job_description || d.description || '',
             email: d.email,
             city: d.city,
             salary: d.salary,
@@ -107,7 +109,7 @@ export default function UserJobs() {
             apply_before: d.apply_before,
             skills: d.skills,
             job_source: d.job_source,
-            job_link: d.job_link ?? id,
+            job_link: d.job_link ?? undefined,
           };
         });
 
@@ -164,6 +166,40 @@ export default function UserJobs() {
     }
   }
 
+  function isSupportedExternalApplyUrl(value: string) {
+    try {
+      const u = new URL(value);
+      const host = u.hostname.toLowerCase();
+      return host.includes('mustakbil.com') || host.includes('rozee.pk');
+    } catch {
+      return false;
+    }
+  }
+
+  async function applyPlatform(job: Job) {
+    if (!user?.email) {
+      setPopupError('Please login to apply.');
+      return;
+    }
+
+    const key = job.job_link || job.id;
+    setApplying((prev) => ({ ...prev, [key]: true }));
+    setApplyStatus((prev) => ({ ...prev, [key]: 'submitted' }));
+
+    try {
+      await applyPlatformJob({
+        email: user.email,
+        job_id: Number(job.id),
+      });
+      setApplyStatus((prev) => ({ ...prev, [key]: 'submitted' }));
+    } catch (err: any) {
+      setApplyStatus((prev) => ({ ...prev, [key]: 'failed' }));
+      setPopupError(err?.message || 'Application failed.');
+    } finally {
+      setApplying((prev) => ({ ...prev, [key]: false }));
+    }
+  }
+
   async function applyDirect(job: Job) {
     if (!user?.email) {
       setPopupError('Please login to apply.');
@@ -171,8 +207,9 @@ export default function UserJobs() {
     }
 
     const key = job.job_link || job.id;
-    if (!isValidUrl(String(job.job_link || ''))) {
-      setPopupError('This job does not have a valid application URL.');
+    const jobLink = String(job.job_link || '');
+    if (!isValidUrl(jobLink) || !isSupportedExternalApplyUrl(jobLink)) {
+      await applyPlatform(job);
       return;
     }
 
@@ -182,9 +219,10 @@ export default function UserJobs() {
     try {
       const run = await startApplyRun({
         email: user.email,
-        url: String(job.job_link),
+        url: jobLink,
         job_title: job.title,
         company_name: job.company,
+        job_id: Number(job.id),
       });
 
       let attempts = 0;
@@ -321,7 +359,11 @@ export default function UserJobs() {
                 disabled={!!applying[job.job_link || job.id]}
                 className="px-4 py-2 rounded-md text-sm font-semibold bg-[#6A1E55] text-white disabled:opacity-60"
               >
-                {applying[job.job_link || job.id] ? 'Applying...' : 'Apply Directly'}
+                {applying[job.job_link || job.id]
+                  ? 'Applying...'
+                  : isValidUrl(String(job.job_link || ''))
+                    ? 'Apply Directly'
+                    : 'Apply on Platform'}
               </button>
               <button
                 onClick={() => toggleSave(job)}

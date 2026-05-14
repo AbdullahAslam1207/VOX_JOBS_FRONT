@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { deleteFavoriteJob, getApplyRunStatus, getFavoriteJobs, getStoredUser, startApplyRun } from '../../api';
+import { applyPlatformJob, deleteFavoriteJob, getApplyRunStatus, getFavoriteJobs, getStoredUser, startApplyRun } from '../../api';
 
 type Job = {
   id: string;
@@ -86,6 +86,40 @@ export default function SavedJobs() {
     }
   }
 
+  function isSupportedExternalApplyUrl(value: string) {
+    try {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      return host.includes('mustakbil.com') || host.includes('rozee.pk');
+    } catch {
+      return false;
+    }
+  }
+
+  async function applyPlatform(job: Job) {
+    if (!user?.email) {
+      setError('Please login to apply to saved jobs.');
+      return;
+    }
+
+    const key = job.job_link || job.id;
+    setApplying((prev) => ({ ...prev, [key]: true }));
+    setApplyStatus((prev) => ({ ...prev, [key]: 'submitted' }));
+
+    try {
+      await applyPlatformJob({
+        email: user.email,
+        job_id: Number(job.id),
+      });
+      setApplyStatus((prev) => ({ ...prev, [key]: 'submitted' }));
+    } catch (err: any) {
+      setApplyStatus((prev) => ({ ...prev, [key]: 'failed' }));
+      setError(err?.message || 'Application failed.');
+    } finally {
+      setApplying((prev) => ({ ...prev, [key]: false }));
+    }
+  }
+
   function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -97,8 +131,8 @@ export default function SavedJobs() {
     }
 
     const key = job.job_link || job.id;
-    if (!job.job_link || !isValidUrl(job.job_link)) {
-      setApplyStatus((prev) => ({ ...prev, [key]: 'failed' }));
+    if (!job.job_link || !isValidUrl(job.job_link) || !isSupportedExternalApplyUrl(job.job_link)) {
+      await applyPlatform(job);
       return;
     }
 

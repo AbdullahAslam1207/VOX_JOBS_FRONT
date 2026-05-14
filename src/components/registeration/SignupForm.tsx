@@ -2,13 +2,21 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
-import { registerUser, mapUiRoleToBackend, persistUserFromAuthResponse, setStoredUser } from '../../api';
+import {
+  registerRecruiter,
+  registerUser,
+  mapUiRoleToBackend,
+  persistUserFromAuthResponse,
+  setStoredUser,
+} from '../../api';
 
 const SignupForm = ({ selectedRole }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [companyWebsite, setCompanyWebsite] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,15 +31,34 @@ const SignupForm = ({ selectedRole }) => {
         setError('Passwords do not match');
         return;
       }
+      if (selectedRole === 'recruiter' && !companyName.trim()) {
+        setError('Please provide your company details');
+        return;
+      }
       setLoading(true);
-      const role = mapUiRoleToBackend('jobseeker');
-      const res = await registerUser({ fullname: fullName, email, password, role });
+      const res = selectedRole === 'recruiter'
+        ? await registerRecruiter({
+            name: fullName,
+            email,
+            password,
+            companyName: companyName.trim(),
+            companyWebsite: companyWebsite.trim() || undefined,
+          })
+        : await registerUser({ fullname: fullName, email, password, role: mapUiRoleToBackend('jobseeker') });
       // Persist user details if available; otherwise store minimal info
       const stored = persistUserFromAuthResponse(res, email);
       if (!stored || !stored.email) {
-        setStoredUser({ ...(stored || {}), email, fullname: fullName, role, user_id: stored?.user_id ?? res?.user_id ?? res?.id });
+        setStoredUser({
+          ...(stored || {}),
+          email,
+          fullname: fullName,
+          role: res?.role || mapUiRoleToBackend('jobseeker'),
+          company_name: companyName.trim() || undefined,
+          company_website: companyWebsite.trim() || undefined,
+          user_id: stored?.user_id ?? res?.user_id ?? res?.id,
+        });
       }
-      window.location.href = '/user';
+      window.location.href = selectedRole === 'recruiter' ? '/recruiter' : '/user';
     } catch (e: any) {
       const errorMessage = e?.message || '';
       // Provide user-friendly error messages
@@ -86,9 +113,27 @@ const SignupForm = ({ selectedRole }) => {
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
       />
+      {selectedRole === 'recruiter' && (
+        <>
+          <InputField
+            label="Company Name"
+            type="text"
+            placeholder="Enter your company name"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+          />
+          <InputField
+            label="Company Website"
+            type="url"
+            placeholder="https://yourcompany.com"
+            value={companyWebsite}
+            onChange={(e) => setCompanyWebsite(e.target.value)}
+          />
+        </>
+      )}
       {error && <div className="text-red-300 text-sm mb-2">{error}</div>}
       <SubmitButton onClick={handleSignup}>
-        {loading ? 'Creating account…' : 'Create Job Seeker Account'}
+        {loading ? 'Creating account…' : selectedRole === 'recruiter' ? 'Create Recruiter Account' : 'Create Job Seeker Account'}
       </SubmitButton>
     </div>
   );

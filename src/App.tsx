@@ -16,6 +16,11 @@ import SavedJobs from './components/user/Saved';
 import UserProfile from './components/user/Profile';
 import AppliedJobs from './components/user/AppliedJobs';
 import MockInterview from './components/user/MockInterview';
+import CVRecommendations from './components/user/CVRecommendations';
+import RecruiterLayout from './components/recruiter/RecruiterLayout';
+import RecruiterDashboard from './components/recruiter/Dashboard';
+import RecruiterCreateJob from './components/recruiter/CreateJob';
+import RecruiterJobApplicants from './components/recruiter/JobApplicants';
 
 function App() {
   return (
@@ -37,6 +42,12 @@ function App() {
           <Route path="profile" element={<UserProfile />} />
           <Route path="applied-jobs" element={<AppliedJobs />} />
           <Route path="mock-interview" element={<MockInterview />} />
+          <Route path="cv-recommendations" element={<CVRecommendations />} />
+        </Route>
+        <Route path="/recruiter" element={<RecruiterLayout />}>
+          <Route index element={<RecruiterDashboard />} />
+          <Route path="create-job" element={<RecruiterCreateJob />} />
+          <Route path="applicants/:jobId" element={<RecruiterJobApplicants />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

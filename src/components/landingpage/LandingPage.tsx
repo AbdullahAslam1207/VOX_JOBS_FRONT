@@ -7,7 +7,7 @@ import SignupForm from '../registeration/SignupForm';
 export default function LandingPage() {
   const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
-  const [selectedRole, setSelectedRole] = useState<'none' | 'admin' | 'jobseeker'>('none');
+  const [selectedRole, setSelectedRole] = useState<'none' | 'admin' | 'jobseeker' | 'recruiter'>('none');
   const [mounted, setMounted] = useState(false);
   const [typewriterText, setTypewriterText] = useState('');
   
@@ -124,17 +124,17 @@ export default function LandingPage() {
               </div>
             )}
 
-            {/* Jobseeker: login or signup */}
-            {selectedRole === 'jobseeker' && (
+            {/* Jobseeker and recruiter: login or signup */}
+            {(selectedRole === 'jobseeker' || selectedRole === 'recruiter') && (
               <>
                 <div className="flex gap-2 mt-4 mb-6 bg-purple-900/30 rounded-lg p-2">
                   <TabButton active={activeTab === 'login'} onClick={() => setActiveTab('login')}>Login</TabButton>
                   <TabButton active={activeTab === 'signup'} onClick={() => setActiveTab('signup')}>Sign Up</TabButton>
           </div>
                 {activeTab === 'login' ? (
-                  <LoginForm selectedRole={'jobseeker'} />
+                  <LoginForm selectedRole={selectedRole} />
                 ) : (
-                  <SignupForm selectedRole={'jobseeker'} />
+                  <SignupForm selectedRole={selectedRole} />
                 )}
               </>
             )}

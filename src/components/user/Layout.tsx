@@ -68,6 +68,7 @@ export default function UserLayout() {
           <NavItem to="saved" label="Saved Jobs" />
           <NavItem to="applied-jobs" label="Applied Jobs" />
           <NavItem to="mock-interview" label="Mock Interview" />
+          <NavItem to="cv-recommendations" label="CV Recommendations" />
         </nav>
         <button onClick={() => setShowChatbot(true)} className="mx-4 mt-4 w-[calc(100%-2rem)] px-4 py-3 rounded-lg font-medium text-sm bg-[#6A1E55] hover:bg-[#7A2E65] text-white transition-colors">
           💬 Chat with Assistant

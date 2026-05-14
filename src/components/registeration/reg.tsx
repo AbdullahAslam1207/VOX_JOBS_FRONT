@@ -9,7 +9,7 @@ import SignupForm from './SignupForm';
 export default function Registration() {
   const [activeTab, setActiveTab] = useState('login');
   // Start with no role chosen; user must pick Admin or Job Seeker first
-  const [selectedRole, setSelectedRole] = useState<'none' | 'admin' | 'jobseeker'>('none');
+  const [selectedRole, setSelectedRole] = useState<'none' | 'admin' | 'jobseeker' | 'recruiter'>('none');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 flex items-center justify-center p-4">
@@ -35,8 +35,8 @@ export default function Registration() {
             </div>
           )}
 
-          {/* Jobseeker: login or signup */}
-          {selectedRole === 'jobseeker' && (
+          {/* Jobseeker and recruiter: login or signup */}
+          {(selectedRole === 'jobseeker' || selectedRole === 'recruiter') && (
             <>
               <div className="flex gap-2 mt-6 mb-6 bg-purple-900/30 rounded-lg p-2">
                 <TabButton
@@ -53,9 +53,9 @@ export default function Registration() {
                 </TabButton>
               </div>
               {activeTab === 'login' ? (
-                <LoginForm selectedRole={'jobseeker'} />
+                <LoginForm selectedRole={selectedRole} />
               ) : (
-                <SignupForm selectedRole={'jobseeker'} />
+                <SignupForm selectedRole={selectedRole} />
               )}
             </>
           )}

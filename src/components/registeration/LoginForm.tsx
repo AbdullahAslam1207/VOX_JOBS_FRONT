@@ -2,7 +2,13 @@
 import React, { useState } from 'react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
-import { loginUser, mapUiRoleToBackend, persistUserFromAuthResponse, setStoredUser } from '../../api';
+import {
+  loginRecruiter,
+  loginUser,
+  mapUiRoleToBackend,
+  persistUserFromAuthResponse,
+  setStoredUser,
+} from '../../api';
 
 const LoginForm = ({ selectedRole }) => {
   const [email, setEmail] = useState('');
@@ -14,15 +20,24 @@ const LoginForm = ({ selectedRole }) => {
     try {
       setError('');
       setLoading(true);
-      const role = mapUiRoleToBackend(selectedRole);
-      const res = await loginUser({ email, password, role });
+      const isRecruiter = selectedRole === 'recruiter';
+      const res = isRecruiter
+        ? await loginRecruiter({ email, password })
+        : await loginUser({ email, password, role: mapUiRoleToBackend(selectedRole) });
       // Persist user details; ensure we keep email even if API omits it
       const stored = persistUserFromAuthResponse(res, email);
       if (!stored || !stored.email) {
-        setStoredUser({ ...(stored || {}), email, role, user_id: stored?.user_id ?? res?.user_id ?? res?.id });
+        setStoredUser({
+          ...(stored || {}),
+          email,
+          role: res?.role || mapUiRoleToBackend(selectedRole),
+          user_id: stored?.user_id ?? res?.user_id ?? res?.id,
+        });
       }
       if (selectedRole === 'admin') {
         window.location.href = '/admin';
+      } else if (isRecruiter) {
+        window.location.href = '/recruiter';
       } else {
         window.location.href = '/user';
       }
@@ -66,7 +81,7 @@ const LoginForm = ({ selectedRole }) => {
       />
       {error && <div className="text-red-300 text-sm mb-2">{error}</div>}
       <SubmitButton onClick={handleLogin}>
-        {loading ? 'Signing in…' : `Login as ${selectedRole === 'admin' ? 'Admin' : 'Job Seeker'}`}
+        {loading ? 'Signing in…' : `Login as ${selectedRole === 'admin' ? 'Admin' : selectedRole === 'recruiter' ? 'Recruiter' : 'Job Seeker'}`}
       </SubmitButton>
     </div>
   );
